@@ -1,0 +1,30 @@
+[project]
+name = "share-lan"
+version = "1.0.0"
+description = "Bagi file ke satu jaringan WiFi/LAN — penerima tinggal scan QR atau ketik IP + kode 4 digit"
+requires-python = ">=3.9"
+dependencies = ["qrcode", "pillow"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.14"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+ignore = [
+    "E501",    # panjang baris diurus formatter, bukan dilaporin
+    "B008",    # panggilan fungsi di argumen default: nggak dipakai di sini
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]  # tes nyisipin sys.path sebelum import lanshare
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
