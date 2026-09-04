@@ -6,6 +6,8 @@ Bagi file ke satu jaringan WiFi/LAN. Penerima tinggal **scan QR** (HP) atau **ke
 uv run lanshare.py ~/Desktop/video.mp4
 ```
 
+![Daftar file share·lan](docs/01-daftar.png)
+
 **Tanpa argumen, server nyala kosong** — nol file kebuka. Path-nya lu lempar belakangan sambil server jalan (lihat bagian berikutnya). Ini disengaja: default ke folder yang lagi aktif itu jebakan, bisa kebuka source code atau isi folder rumah tanpa lu sadar. Mau bagiin folder aktif? Sebutin titiknya: `./lanshare.py .`
 
 ## Cara pakai: terminal jadi dropzone
@@ -75,6 +77,24 @@ Kalau yang lu drop cuma **satu file**, QR-nya nunjuk persis ke file itu — scan
 - Streaming video/audio langsung di browser tanpa download penuh
 - Kirim file balik ke lu (drag & drop, bisa dimatiin pakai `--read-only`)
 - Ambil SHA-256 per file atau `SHA256SUMS` satu folder buat mastiin hasilnya utuh
+
+### Tampilannya
+
+Folder yang isinya dominan gambar kebuka sebagai galeri, lengkap sama thumbnail — bukan daftar teks:
+
+![Mode grid dengan thumbnail](docs/02-galeri.png)
+
+Tiap baris punya tombol QR sendiri. Klik → QR gede di tengah layar, sodorin ke muka orang, HP mereka langsung download file itu:
+
+![Overlay QR per file](docs/03-qr.png)
+
+Tema ikut sistem, dan terangnya digarap beneran — bukan sekadar dibalik warnanya:
+
+![Tema terang](docs/04-terang.png)
+
+Di HP, listing-nya nyusun ulang jadi satu-dua kolom dengan target sentuh yang gede:
+
+<p align="center"><img src="docs/05-hp.png" width="330" alt="Tampilan di HP"></p>
 
 ## Transfer file gede
 
