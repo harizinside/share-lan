@@ -288,7 +288,7 @@ def test_can_upload_ngikut_writability_folder(tree):
 
 def test_traversal_ditolak_di_semua_route(server):
     server.login("4815")
-    for route in ("/dl", "/zip", "/api/hash", "/thumb", "/urls", "/sums"):
+    for route in ("/dl", "/zip", "/api/hash", "/thumb", "/preview", "/urls", "/sums"):
         status, _, _ = server.get(f"{route}?p=Dokumen%2F..%2F..%2Fetc%2Fpasswd")
         assert status in (403, 404), route
 
@@ -370,6 +370,51 @@ def test_thumbnail_pdf_rusak_ngasih_404(server, tree):
     (tree / "Dokumen" / "rusak.pdf").write_bytes(b"bukan PDF")
     server.login("4815")
     assert server.get("/thumb?p=Dokumen/rusak.pdf")[0] == 404
+
+
+# ---------------------------------------------------------------- preview
+
+
+def test_halaman_utama_punya_modal_preview(server):
+    server.login("4815")
+    _, _, body = server.get("/")
+    html = body.decode()
+    assert 'id="pvModal"' in html
+    assert "canPreview" in html  # tombol preview dirender oleh JS ini
+
+
+def test_preview_teks_inline(server):
+    server.login("4815")
+    status, headers, body = server.get("/preview?p=Dokumen/catatan.txt")
+    assert status == 200
+    assert headers["Content-Type"].startswith("text/plain")
+    assert b"halo dunia" in body
+
+
+@pytest.mark.skipif(L.HAVE_GROUPDOCS, reason="GroupDocs kepasang, format Office ke-render")
+def test_preview_office_tanpa_groupdocs_ngasih_404(server, tree):
+    (tree / "Dokumen" / "laporan.docx").write_bytes(b"bukan docx beneran")
+    server.login("4815")
+    status, _, body = server.get("/preview?p=Dokumen/laporan.docx")
+    assert status == 404
+    assert b"groupdocs-viewer-net" in body
+
+
+def test_preview_format_tak_kenal_404(server):
+    server.login("4815")
+    assert server.get("/preview?p=Dokumen/data.bin")[0] == 404
+
+
+def test_preview_pdf_dikirim_inline(server, tree):
+    from PIL import Image
+
+    path = tree / "Dokumen" / "mini.pdf"
+    Image.new("RGB", (200, 300), "white").save(path, "PDF")
+    server.login("4815")
+    status, headers, body = server.get("/preview?p=Dokumen/mini.pdf")
+    assert status == 200
+    assert body.startswith(b"%PDF")
+    assert "inline" in headers["Content-Disposition"]
 
 
 def test_server_kosong_gak_ngebocorin_apa_apa(tree):

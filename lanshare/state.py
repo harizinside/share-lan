@@ -36,6 +36,7 @@ class State:
         self.crc_cache = {}  # (path, size, mtime) -> crc32
         self.hash_cache = {}  # (path, size, mtime) -> sha256
         self.thumb_cache = {}  # (path, size, mtime, box) -> (bytes, content_type)
+        self.preview_cache = {}  # (path, size, mtime, "gdocs") -> (bytes html, halaman)
         self.zip_plans = {}  # path -> (tanda tangan isi, segmen, ukuran)
         self.single_root = False  # cuma 1 folder yang dishare -> folder itu jadi root
         self.addresses = []  # [(ip, iface, skor)]

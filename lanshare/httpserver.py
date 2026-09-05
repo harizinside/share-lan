@@ -22,6 +22,7 @@ from .mounts import (
     walk_files,
 )
 from .pages import ERROR_PAGE, login_page, page_html
+from .preview import DOC_EXT, HAVE_GROUPDOCS, RenderError, previewable, render_html
 from .qr import qr_svg
 from .state import APP, CHUNK, INLINE_EXT, SESSION_TTL, ST
 from .thumb import make_thumb, sha256_of
@@ -495,6 +496,31 @@ class Handler(BaseHTTPRequestHandler):
                     return self.fail(404, "Nggak ada thumbnail.")
                 data, ctype = thumb
                 return self.send(200, data, ctype, {"Cache-Control": "private, max-age=86400"})
+            if route == "/preview":
+                if target is None or not os.path.isfile(target):
+                    return self.fail(404, "Bukan file.")
+                name = os.path.basename(target)
+                ext = os.path.splitext(name)[1].lower()
+                # GroupDocs ngerjain format Office/CAD/ebook; kalau nggak kepasang,
+                # format itu yang dideny - PDF/gambar/media/teks tetap fallback native.
+                if not HAVE_GROUPDOCS and ext in DOC_EXT:
+                    return self.fail(404, "Preview dokumen butuh groupdocs-viewer-net.")
+                if ext in (".txt", ".md", ".csv") or previewable(name):
+                    if HAVE_GROUPDOCS and ext in DOC_EXT:
+                        try:
+                            data, _ = render_html(target)
+                        except RenderError as e:
+                            return self.fail(422, f"Dokumen nggak bisa di-render: {e}")
+                        return self.send(
+                            200,
+                            data,
+                            "text/html; charset=utf-8",
+                            {"Cache-Control": "private, max-age=300"},
+                        )
+                    return self.serve_file(target, name)  # inline (teks/media/pdf)
+                if ext in INLINE_EXT:
+                    return self.serve_file(target, name)
+                return self.fail(404, "Format ini nggak ada preview-nya.")
         except (BrokenPipeError, ConnectionResetError):
             fmt.log(f"{C.dim('[' + self.ip + ']')} {C.warn('dibatalin klien')}")
             self.close_connection = True

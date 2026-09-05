@@ -77,6 +77,10 @@ Kalau yang lu drop cuma **satu file**, QR-nya nunjuk persis ke file itu — scan
 
 - Lihat & telusuri folder, cari file, mode daftar atau grid dengan thumbnail
 - Download per file, atau satu folder sekaligus sebagai ZIP
+- **Preview langsung di browser** — klik ikon mata: PDF, gambar, video, audio, dan teks
+  kebuka pakai viewer bawaan browser; format Office (docx, xlsx, pptx, odt, rtf, dst)
+  ke-render jadi HTML pakai [GroupDocs.Viewer](https://pypi.org/project/groupdocs-viewer-net/)
+  kalau terpasang (`uv pip install groupdocs-viewer-net` atau `uv run --extra viewer`)
 - Klik tombol QR di baris mana pun → QR gede buat item itu (buat nunjuk satu file ke HP orang)
 - Streaming video/audio langsung di browser tanpa download penuh
 - Kirim file balik ke lu (drag & drop, bisa dimatiin pakai `--read-only`)
@@ -158,7 +162,7 @@ lanshare [PATH ...]
 
 ## Catatan teknis
 
-Servernya paket Python biasa (folder `lanshare/`, satu modul kecil per tanggung jawab — mount, auth, HTTP, ZIP, halaman, dst), dua dependency (`qrcode`, `pillow`) dideklarasiin di `pyproject.toml` — uv yang ngurus instalasinya. Pillow opsional: kalau nggak ada, thumbnail mati dan UI mundur ke ikon, sisanya jalan normal. Sisanya stdlib.
+Servernya paket Python biasa (folder `lanshare/`, satu modul kecil per tanggung jawab — mount, auth, HTTP, ZIP, halaman, dst), dependency (`qrcode`, `pillow`, `pypdfium2`) dideklarasiin di `pyproject.toml` — uv yang ngurus instalasinya. Pillow opsional: kalau nggak ada, thumbnail mati dan UI mundur ke ikon, sisanya jalan normal. `groupdocs-viewer-net` juga opsional (`--extra viewer`): kalau nggak ada, preview dokumen Office mati dan PDF/gambar/media tetap ke-preview pakai viewer browser. Sisanya stdlib.
 
 ## Install lewat satu baris (tanpa clone)
 

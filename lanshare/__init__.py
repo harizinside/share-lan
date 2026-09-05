@@ -33,6 +33,7 @@ from .mounts import (
 )
 from .network import find_addresses, local_hostname
 from .pages import login_page, page_html
+from .preview import DOC_EXT, HAVE_GROUPDOCS, previewable, render_html
 from .qr import qr_ascii, qr_matrix, qr_svg
 from .state import ST, State
 from .thumb import HAVE_PIL, crc32_of, file_key, make_thumb, sha256_of
@@ -41,7 +42,9 @@ from .ziputil import Stale, StreamWriter, build_zip_plan, emit_plan, zip_entries
 __all__ = [
     "C",
     "Denied",
+    "DOC_EXT",
     "HAVE_PIL",
+    "HAVE_GROUPDOCS",
     "Handler",
     "Missing",
     "ST",
@@ -81,11 +84,13 @@ __all__ = [
     "parse_args",
     "parse_range",
     "parse_size",
+    "previewable",
     "print_banner",
     "print_shared",
     "qr_ascii",
     "qr_matrix",
     "qr_svg",
+    "render_html",
     "recompute",
     "remove_mount",
     "resolve",

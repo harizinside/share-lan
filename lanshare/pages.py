@@ -3,6 +3,7 @@ import json
 import os
 
 from .mounts import Denied, Missing, can_upload_here, resolve
+from .preview import HAVE_GROUPDOCS
 from .state import ST
 from .thumb import HAVE_PDF, HAVE_PIL
 
@@ -226,6 +227,30 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 .sheet .row2 button.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));
   color:#fff;border-color:transparent}
 
+/* modal preview dokumen */
+.modal.pv{padding:0}
+.pvbox{width:min(1000px,96vw);height:min(88vh,900px);display:flex;flex-direction:column;
+  background:var(--bg);color:var(--ink);border-radius:18px;overflow:hidden;
+  border:1px solid var(--line);box-shadow:0 24px 70px rgba(0,0,0,.5);animation:pop .22s}
+.pvhead{display:flex;align-items:center;gap:10px;padding:10px 14px;
+  border-bottom:1px solid var(--line2);background:var(--card)}
+.pvhead b{font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.pvhead small{color:var(--muted);font-size:12px;flex:none}
+.pvspring{flex:1}
+.pvhead .btn{height:32px;padding:0 12px;font-size:13px}
+.pvbody{flex:1;min-height:0;background:#fff}
+.pvbody iframe{width:100%;height:100%;border:0;display:block}
+.card .pv{position:absolute;bottom:6px;left:6px;width:28px;height:28px;border-radius:8px;
+  background:rgba(0,0,0,.45);color:#fff;display:grid;place-items:center;opacity:0;
+  transition:opacity .15s;backdrop-filter:blur(4px)}
+.card .pv svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.card:hover .pv{opacity:1}
+@media (hover:none){.card .pv{opacity:1}}
+@media (max-width:560px){.pvbox{width:100vw;height:100vh;border-radius:0}
+  .pvhead small{display:none}}
+
 /* toast */
 .toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:104px;z-index:80;
   display:flex;flex-direction:column;gap:8px;align-items:center}
@@ -288,6 +313,7 @@ const KIND = {dir:"Folder", image:"Gambar", video:"Video", audio:"Audio",
               sql:"Database", code:"Kode", file:"File"};
 const kindTag = e => `<span class="kind">${e.dir?"Folder":KIND[e.kind]||"File"}</span>`;
 const UI = {
+  eye:'<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
   qr:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2M14 21h1"/></svg>',
   dl:'<svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/></svg>',
   zip:'<svg viewBox="0 0 24 24"><path d="M20 7 12 3 4 7v10l8 4 8-4z"/><path d="M12 12v9M4 7l8 5 8-5"/></svg>',
@@ -319,6 +345,9 @@ async function copy(text, msg){ try{ await navigator.clipboard.writeText(text); 
     a.select(); document.execCommand("copy"); a.remove(); toast(msg||"Disalin"); } }
 const dlUrl = p => `/dl?p=${enc(p)}&dl=1`;
 const abs = u => location.origin + u + (u.includes("?")?"&":"?") + "code=" + CFG.code;
+const DOC_RE = /\.(txt|md|csv|docx?|docm|dotx?|xlsx?|xlsm|xlsb|xltx?|pptx?|pptm|ppsx?|potx?|odt|ods|odp|rtf|epub|mobi|msg|eml|vsdx?|dwg|dxf)$/i;
+const canPreview = e => !e.dir && (e.kind==="image"||e.kind==="video"||e.kind==="audio"||isPdf(e)||
+  (CFG.preview ? DOC_RE.test(e.name) : /\.(txt|md|csv)$/i.test(e.name)));
 
 /* ---------- tema & tampilan ---------- */
 function applyTheme(){ const t=localStorage.getItem("ls-theme");
@@ -453,6 +482,7 @@ function render(){
         <div class="ph" data-open="${escA(e.path)}" data-dir="${e.dir?1:0}">${ico(e.kind,"ic")}${tb}
           <input type="checkbox" class="ck" style="position:absolute;top:8px;left:8px;z-index:2"
                  data-check="${escA(e.path)}" ${S.sel.has(e.path)?"checked":""}>
+          ${canPreview(e)?`<button class="pv" data-prev="${escA(e.path)}" title="Preview">${UI.eye}</button>`:""}
           <button class="qr" data-qr="${escA(e.path)}" data-isdir="${e.dir?1:0}" title="QR">${UI.qr}</button>
         </div>
         <div class="cap">${ico(e.kind,"ic")}<span title="${escA(e.name)}">${esc(e.name)}</span>${kindTag(e)}</div>
@@ -460,6 +490,7 @@ function render(){
     const chk = `<input type="checkbox" class="ck" data-check="${escA(e.path)}"
         ${S.sel.has(e.path)?"checked":""} aria-label="Pilih ${escA(e.name)}">`;
     const act = `<div class="act">
+          ${canPreview(e)?`<button class="iconbtn" data-prev="${escA(e.path)}" title="Preview">${UI.eye}</button>`:""}
           <a class="iconbtn" href="${e.dir?`/zip?p=${enc(e.path)}`:dlUrl(e.path)}" title="Download">${UI.dl}</a>
           <button class="iconbtn" data-qr="${escA(e.path)}" data-isdir="${e.dir?1:0}" title="QR">${UI.qr}</button>
         </div>`;
@@ -566,6 +597,19 @@ function showQR(url, title, sub){
   $("#sheetOpen").onclick=()=>{ location.href=url; };
 }
 
+/* ---------- preview dokumen ---------- */
+function showPreview(p){
+  $("#pvTitle").textContent = p.split("/").pop();
+  $("#pvFrame").src = `/preview?p=${enc(p)}`;
+  $("#pvDl").href = dlUrl(p);
+  $("#pvModal").classList.add("on");
+}
+function hidePreview(){
+  if(!$("#pvModal").classList.contains("on")) return;
+  $("#pvModal").classList.remove("on");
+  $("#pvFrame").src = "about:blank";  /* matiin media yang lagi jalan di iframe */
+}
+
 /* ---------- upload ---------- */
 function upload(files){
   [...files].forEach(f=>{
@@ -594,7 +638,7 @@ function upload(files){
 
 /* ---------- event ---------- */
 document.addEventListener("click", ev=>{
-  const t=ev.target.closest("[data-go],[data-open],[data-qr],[data-hash],[data-zip],[data-urls],[data-qrfolder],[data-selzip],[data-selclear],[data-sort]");
+  const t=ev.target.closest("[data-go],[data-open],[data-qr],[data-prev],[data-hash],[data-zip],[data-urls],[data-qrfolder],[data-selzip],[data-selclear],[data-sort]");
   if(!t) return;
   if(t.dataset.go!==undefined){ load(t.dataset.go); return; }
   if(t.dataset.open!==undefined){
@@ -606,6 +650,7 @@ document.addEventListener("click", ev=>{
     const u=abs(dir?`/zip?p=${enc(p)}`:dlUrl(p));
     showQR(u, p.split("/").pop(), dir?"Scan buat download folder (ZIP)":"Scan buat download file ini");
     return; }
+  if(t.dataset.prev!==undefined){ ev.preventDefault(); showPreview(t.dataset.prev); return; }
   if(t.dataset.qrfolder!==undefined){
     showQR(abs(S.path?`/?p=${enc(S.path)}`:"/"), S.path.split("/").pop()||"Semua file",
            "Scan buat buka daftar ini"); return; }
@@ -631,7 +676,9 @@ document.addEventListener("change", ev=>{
   render();
 });
 $("#modal").onclick = e => { if(e.target.id==="modal") $("#modal").classList.remove("on"); };
-addEventListener("keydown", e=>{ if(e.key==="Escape") $("#modal").classList.remove("on");
+$("#pvModal").onclick = e => { if(e.target.id==="pvModal") hidePreview(); };
+$("#pvClose").onclick = hidePreview;
+addEventListener("keydown", e=>{ if(e.key==="Escape"){ $("#modal").classList.remove("on"); hidePreview(); }
   if(e.key==="/" && document.activeElement!==$("#q")){ e.preventDefault(); $("#q").focus(); } });
 $("#q").oninput = e => { S.filter=e.target.value; render(); };
 $("#themeBtn").onclick = toggleTheme;
@@ -706,6 +753,17 @@ __UPLOAD__
     <button id="sheetOpen" class="primary">Buka</button>
   </div>
 </div></div>
+<div class="modal pv" id="pvModal">
+  <div class="pvbox">
+    <header class="pvhead">
+      <b id="pvTitle"></b><small>Preview — file asli nggak diubah</small>
+      <span class="pvspring"></span>
+      <a class="btn" id="pvDl" href="#">Download</a>
+      <button class="iconbtn" id="pvClose" title="Tutup">✕</button>
+    </header>
+    <div class="pvbody"><iframe id="pvFrame" title="Preview dokumen"></iframe></div>
+  </div>
+</div>
 <div class="toasts" id="toasts"></div>
 <script>__JS__</script>
 </body></html>"""
@@ -784,6 +842,7 @@ def page_html():
         "canUpload": can_upload_here(initial_target),
         "thumbs": HAVE_PIL,
         "pdfThumbs": HAVE_PDF,
+        "preview": HAVE_GROUPDOCS,
         "singleRoot": ST.single_root,
     }
     title = os.path.basename(next(iter(ST.mounts))) if len(ST.mounts) == 1 else "share·lan"
