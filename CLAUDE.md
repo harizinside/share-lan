@@ -4,74 +4,97 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`share·lan` (`lanshare.py`) is a single-file Python LAN file-sharing server. You point it at
+`share·lan` is a Python LAN file-sharing server, packaged as `lanshare/`. You point it at
 files/folders, it serves them over HTTP to anyone on the same WiFi/LAN via a 4-digit access code
-or QR scan — no cloud, no accounts, no client install. Everything (server, HTTP handling, HTML/JS
-frontend, ZIP streaming, QR generation) lives in `lanshare.py` (~2400 lines). README.md (in
-Indonesian) is the user-facing doc; treat it as authoritative for behavior/UX decisions.
+or QR scan — no cloud, no accounts, no client install. README.md (in Indonesian) is the
+user-facing doc; treat it as authoritative for behavior/UX decisions.
 
 ## Commands
 
 ```bash
 uv run --group dev ruff check .      # lint
 uv run --group dev ruff format .     # format
-uv run --group dev pytest            # run all tests (100 tests, ~3s)
+uv run --group dev pytest            # run all tests (109 tests, ~3s)
 uv run --group dev pytest tests/test_http.py::test_name   # run a single test
 uv run --group dev pytest tests/test_zip.py                # run one file's tests
 
-./lanshare.py ~/some/file.txt        # run the server directly (executable, PEP 723 shebang)
+uv run lanshare ~/some/file.txt      # run the server (console-script from pyproject.toml)
+uv tool install --editable . && lanshare ...   # install once, then call `lanshare` from anywhere
 ```
 
-`uv` manages the dependency groups (`pyproject.toml`): the app itself only needs `qrcode` +
-`pillow` (declared in the PEP 723 header at the top of `lanshare.py`, not in `pyproject.toml`),
-while `dev` adds `pytest`/`ruff`. This means `./lanshare.py` runs standalone via `uv run --script`
-without touching the dev group — don't add runtime deps to `pyproject.toml`; add them to the PEP
-723 header block instead.
-
-Pillow is optional at runtime: guarded by `HAVE_PIL`, thumbnails just no-op without it.
+Runtime deps (`qrcode`, `pillow`) and dev deps (`pytest`, `ruff`) both live in `pyproject.toml`
+(`[project.dependencies]` and the `dev` dependency-group respectively) — there's no separate
+PEP 723 header to keep in sync anymore. Pillow is optional at runtime: guarded by `HAVE_PIL`
+(defined in `lanshare/thumb.py`), thumbnails just no-op without it.
 
 ## Architecture
 
-Everything runs in one process, one file, organized into clearly marked `# ----` sections (search
-for these to navigate — there is no module split to worry about):
+The app is a package, `lanshare/`, split into one module per responsibility. The import graph is
+a strict DAG (no cycles) — each row only imports from rows above it:
 
-- **`State` (`ST`)** — single global object holding all cross-thread state: active mounts, auth
-  sessions/lockouts, CRC/SHA256/ZIP-plan caches, upload dir, revision counter. Guarded by
-  `ST.lock` where mutated concurrently. There is exactly one instance; tests reset relevant fields
-  between runs (see `tests/conftest.py`).
-- **Mounts (`build_mounts`, `add_paths`, `remove_mount`)** — the mapping from a dropped
-  filesystem path to the display name the recipient sees. Adding/removing paths while the server
-  is live goes through this and bumps `ST.revision` so connected clients' `/api/rev` poll picks up
-  the change.
-- **Path resolution (`resolve`, `Denied`, `Missing`)** — every incoming `p` query param is
-  resolved back against the mounts and must not escape them; this is the security boundary for
-  path traversal and outward-pointing symlinks. Always route new file-serving code through
-  `resolve()` rather than joining paths manually.
-- **Auth (`check_code`, `lock_left`, session cookies)** — 4-digit code auth with per-IP
+| Module | Responsibility |
+|---|---|
+| `state.py` | Top-level constants and the single `State`/`ST` singleton (all cross-thread state) |
+| `fmt.py` | Size formatting, ANSI color helper `C`, `log`/`die` |
+| `qr.py` | QR matrix/SVG/ASCII rendering |
+| `network.py` | Picks which local IP to advertise (scores interfaces, prefers the default route) |
+| `mounts.py` | Path <-> display-name mapping, path-traversal guard (`resolve`, `Denied`, `Missing`), directory listing/stats |
+| `thumb.py` | `HAVE_PIL` + checksums (`crc32_of`, `sha256_of`) + in-memory thumbnail cache |
+| `banner.py` | The terminal banner printed on startup / `qr` console command |
+| `ziputil.py` | The resumable-ZIP engine (byte-exact plan + emit) |
+| `pages.py` | All served HTML/CSS/JS as inline string templates |
+| `auth.py` | 4-digit code auth, session cookies, brute-force lockout |
+| `console.py` | The interactive `ls`/`rm`/`qr`/`q` REPL on stdin |
+| `httpserver.py` | `Handler`/`Server` — the actual HTTP routing |
+| `cli.py` | argparse, `configure()`, `main()` |
+
+`lanshare/__init__.py` re-exports the public surface of all of the above (with `__all__`, so ruff
+doesn't flag the re-exports as unused) — this is what `tests/conftest.py`'s `import lanshare as L`
+relies on, and what keeps `L.ST`, `L.Handler`, etc. working exactly as before the split.
+
+**One deliberate wrinkle:** `tests/conftest.py` monkeypatches `L.fmt.log = lambda *a, **k: None` to
+silence server logging during tests. All `log(...)` call sites live in `httpserver.py`, and that
+module calls it as `fmt.log(...)` (via `from . import fmt`) rather than `from .fmt import log` —
+importing the bare name would bind a snapshot reference that the monkeypatch couldn't reach.
+Follow the same qualified-import pattern (`from . import fmt`, then `fmt.something(...)`) for any
+new cross-module call that tests might need to patch.
+
+- **`State` (`ST`)**, in `state.py` — single global object holding all cross-thread state: active
+  mounts, auth sessions/lockouts, CRC/SHA256/thumbnail/ZIP-plan caches, upload dir, revision
+  counter. Guarded by `ST.lock` where mutated concurrently. There is exactly one instance, shared
+  by every module via `from .state import ST`.
+- **Mounts** (`mounts.py`: `build_mounts`, `add_paths`, `remove_mount`) — the mapping from a
+  dropped filesystem path to the display name the recipient sees. Adding/removing paths while the
+  server is live goes through this and bumps `ST.revision` so connected clients' `/api/rev` poll
+  picks up the change.
+- **Path resolution** (`mounts.py`: `resolve`, `Denied`, `Missing`) — every incoming `p` query
+  param is resolved back against the mounts and must not escape them; this is the security
+  boundary for path traversal and outward-pointing symlinks. Always route new file-serving code
+  through `resolve()` rather than joining paths manually.
+- **Auth** (`auth.py`: `check_code`, `lock_left`, session cookies) — 4-digit code auth with per-IP
   exponential-backoff lockout (`ST.fails`) plus a global failure counter (`ST.global_fails`) that
-  auto-rotates the code after too many attempts LAN-wide. Sessions are cookie tokens in
-  `ST.sessions` with a TTL.
-- **ZIP engine (`build_zip_plan`, `emit_plan`, `StreamWriter`, `_central_record`/`_end_record`)**
-  — the resumable-ZIP trick: for folders under `--zip-resume-limit` (default 20G), CRCs are
-  precomputed and the exact ZIP byte layout is planned up front so a `Range` request into the
-  middle of the ZIP reproduces byte-for-byte what a full download would have produced at that
-  offset (this is what `tests/test_zip.py` verifies). Above the limit, it falls back to a
-  streaming (non-resumable) ZIP and the UI offers a copyable URL list instead.
-- **HTTP layer (`Handler`, `Server`)** — a `BaseHTTPRequestHandler` subclass with hand-rolled
-  routing in `do_GET`/`do_POST`/`do_PUT` (no framework). Routes split into page routes (`/`,
-  `/login`), JSON `/api/*` routes (list, rev, zipinfo, hash), and byte-serving routes (`/dl`,
+  auto-rotates the code after too many attempts LAN-wide.
+- **ZIP engine** (`ziputil.py`: `build_zip_plan`, `emit_plan`, `StreamWriter`) — the resumable-ZIP
+  trick: for folders under `--zip-resume-limit` (default 20G), CRCs are precomputed and the exact
+  ZIP byte layout is planned up front so a `Range` request into the middle of the ZIP reproduces
+  byte-for-byte what a full download would have produced at that offset (this is what
+  `tests/test_zip.py` verifies). Above the limit, it falls back to a streaming (non-resumable) ZIP
+  and the UI offers a copyable URL list instead.
+- **HTTP layer** (`httpserver.py`: `Handler`, `Server`) — a `BaseHTTPRequestHandler` subclass with
+  hand-rolled routing in `do_GET`/`do_POST`/`do_PUT` (no framework). Routes split into page routes
+  (`/`, `/login`), JSON `/api/*` routes (list, rev, zipinfo, hash), and byte-serving routes (`/dl`,
   `/zip`, `/thumb`, `/urls`, `/sums`, `/qr`). `pump()` uses `socket.sendfile` (zero-copy) with a
   manual-copy fallback for platforms that don't support it. `/dl` supports `Range`/multi-range for
   resumable downloads.
-- **Frontend (`page_html`, `login_page`)** — the entire recipient-facing UI (HTML/CSS/JS) is
-  generated as inline strings served from these functions; there's no separate static asset
-  pipeline or build step.
-- **Networking (`find_addresses`, `_route_ip`, `_score`)** — picks which local IP to advertise in
-  the QR/banner among multiple interfaces (VPN/Docker/Tailscale can all present addresses),
-  scoring candidates and preferring the one that matches the default route.
-- **Console loop (`console_loop`)** — the interactive `ls`/`rm`/`qr`/`q` REPL that runs on stdin
-  while the server thread serves requests, letting users add/remove shared paths without
-  restarting.
+- **Frontend** (`pages.py`: `page_html`, `login_page`) — the entire recipient-facing UI
+  (HTML/CSS/JS) is generated as inline strings served from these functions; there's no separate
+  static asset pipeline or build step.
+- **Networking** (`network.py`: `find_addresses`, `_route_ip`, `_score`) — picks which local IP to
+  advertise in the QR/banner among multiple interfaces (VPN/Docker/Tailscale can all present
+  addresses), scoring candidates and preferring the one that matches the default route.
+- **Console loop** (`console.py`: `console_loop`) — the interactive `ls`/`rm`/`qr`/`q` REPL that
+  runs on stdin while the server thread serves requests, letting users add/remove shared paths
+  without restarting.
 
 ## Test layout
 

@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import lanshare as L
 
-L.log = lambda *a, **k: None  # log server nggak perlu berisik di output tes
+L.fmt.log = lambda *a, **k: None  # log server nggak perlu berisik di output tes
 
 
 @pytest.fixture

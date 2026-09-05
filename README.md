@@ -3,19 +3,19 @@
 Bagi file ke satu jaringan WiFi/LAN. Penerima tinggal **scan QR** (HP) atau **ketik IP + kode 4 digit** (laptop). Nggak ada cloud, nggak ada akun, penerima nggak perlu install apa pun — cukup browser.
 
 ```bash
-uv run lanshare.py ~/Desktop/video.mp4
+uv run lanshare ~/Desktop/video.mp4
 ```
 
 ![Daftar file share·lan](docs/01-daftar.png)
 
-**Tanpa argumen, server nyala kosong** — nol file kebuka. Path-nya lu lempar belakangan sambil server jalan (lihat bagian berikutnya). Ini disengaja: default ke folder yang lagi aktif itu jebakan, bisa kebuka source code atau isi folder rumah tanpa lu sadar. Mau bagiin folder aktif? Sebutin titiknya: `./lanshare.py .`
+**Tanpa argumen, server nyala kosong** — nol file kebuka. Path-nya lu lempar belakangan sambil server jalan (lihat bagian berikutnya). Ini disengaja: default ke folder yang lagi aktif itu jebakan, bisa kebuka source code atau isi folder rumah tanpa lu sadar. Mau bagiin folder aktif? Sebutin titiknya: `uv run lanshare .`
 
 ## Cara pakai: terminal jadi dropzone
 
-Ketik `uv run lanshare.py ` (pakai spasi di belakang), lalu **seret file/folder dari Finder ke jendela terminal** — path-nya nempel sendiri, spasi udah ke-escape. Drop sebanyak yang lu mau, campur file sama folder juga boleh, terus Enter.
+Ketik `uv run lanshare ` (pakai spasi di belakang), lalu **seret file/folder dari Finder ke jendela terminal** — path-nya nempel sendiri, spasi udah ke-escape. Drop sebanyak yang lu mau, campur file sama folder juga boleh, terus Enter.
 
 ```bash
-uv run lanshare.py ~/Desktop/video.mp4 ~/Documents/laporan.pdf ~/Foto\ Liburan/
+uv run lanshare ~/Desktop/video.mp4 ~/Documents/laporan.pdf ~/Foto\ Liburan/
 ```
 
 Yang muncul di terminal:
@@ -46,7 +46,7 @@ Yang muncul di terminal:
 Server-nya bisa dinyalain kosong dulu, terus diisi belakangan — QR-nya udah bisa discan dari awal:
 
 ```bash
-./lanshare.py
+uv run lanshare
 ```
 
 Setelah nyala, terminal itu jadi kendali. Seret file/folder dari Finder ke jendela terminal terus Enter, atau ketik path-nya:
@@ -119,7 +119,7 @@ Buat ratusan GB, cara ini yang paling waras: paralel, dan kalau satu file gagal 
 ## Opsi
 
 ```
-lanshare.py [PATH ...]
+lanshare [PATH ...]
 
   (tanpa PATH: server nyala kosong, path dilempar lewat terminal)
 
@@ -155,21 +155,18 @@ lanshare.py [PATH ...]
 
 ## Catatan teknis
 
-Satu file Python, dua dependency (`qrcode`, `pillow`) yang dideklarasiin di header PEP 723 — uv yang ngurus instalasinya. Pillow di-import opsional: kalau nggak ada, thumbnail mati dan UI mundur ke ikon, sisanya jalan normal. Sisanya stdlib.
+Servernya paket Python biasa (folder `lanshare/`, satu modul kecil per tanggung jawab — mount, auth, HTTP, ZIP, halaman, dst), dua dependency (`qrcode`, `pillow`) dideklarasiin di `pyproject.toml` — uv yang ngurus instalasinya. Pillow opsional: kalau nggak ada, thumbnail mati dan UI mundur ke ikon, sisanya jalan normal. Sisanya stdlib.
 
 ## Jalan tanpa ngetik `uv run`
 
-File-nya udah executable dan shebang-nya `#!/usr/bin/env -S uv run --script`, jadi bisa langsung:
+`pyproject.toml` ndaftarin `lanshare` sebagai command global. Install sekali pakai `uv tool install`, terus bisa dipanggil langsung dari mana aja tanpa `uv run`:
 
 ```bash
-./lanshare.py ~/Desktop/video.mp4
+uv tool install --editable .
+lanshare ~/Desktop/video.mp4
 ```
 
-Mau dipanggil dari mana aja? Taruh symlink di PATH:
-
-```bash
-ln -s "$PWD/lanshare.py" /usr/local/bin/lanshare
-```
+`--editable` bikin perubahan di kode langsung kepakai tanpa install ulang.
 
 ## Development
 
@@ -190,4 +187,4 @@ uv run --group dev pytest            # tes
 | `tests/test_zip.py` | Layout byte ZIP persis, hasil potong-potong harus identik sama sekali-ambil (**ini yang menjamin resume**), ZIP64, unicode, cache CRC |
 | `tests/test_http.py` | End-to-end lewat HTTP: auth, alur scan, rate limit, Range/416/multi-range, resume ZIP, mode streaming, upload, batas ukuran, read-only, `/sums`, `/urls`, `/qr`, `/thumb` |
 
-Konfigurasinya ada di `pyproject.toml`. Servernya sendiri tetap satu berkas dengan header PEP 723, jadi `./lanshare.py` masih jalan sendiri tanpa nyentuh grup `dev`.
+Konfigurasinya ada di `pyproject.toml`.
