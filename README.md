@@ -168,6 +168,36 @@ lanshare ~/Desktop/video.mp4
 
 `--editable` bikin perubahan di kode langsung kepakai tanpa install ulang.
 
+## Jalan lewat Docker
+
+Image resminya dipublish ke GHCR lewat GitHub Actions tiap push ke `main`/tag rilis
+(`.github/workflows/docker-publish.yml`) — `docker-compose.yaml` di root repo sudah
+siap pakai:
+
+```bash
+mkdir -p shared && cp file-yang-mau-dibagi shared/
+docker compose up -d
+docker compose logs -f      # lihat QR + kode 4 digit di sini
+```
+
+Folder host `./shared` ke-mount ke `/data` di dalam container; edit `command:` di
+compose file buat nambah flag lain (`--read-only`, `--code`, `--max-upload`, dst — lihat
+[Opsi](#opsi)).
+
+Catatan jaringan: container punya network namespace sendiri, jadi deteksi IP LAN
+otomatis (`--ip`, banner, QR) bisa nunjuk ke alamat internal Docker, bukan IP LAN host
+yang beneran. Kalau itu kejadian, uncomment `network_mode: host` di
+`docker-compose.yaml` (Linux saja) biar share-lan lihat network host langsung, atau
+paksa manual pakai `--ip <ip-lan-host>`.
+
+Mau build sendiri dari source, bukan pull dari GHCR? Ganti `image:` jadi `build: .` di
+compose file, atau langsung:
+
+```bash
+docker build -t share-lan .
+docker run --rm -p 8000:8000 -v "$(pwd)/shared:/data" share-lan
+```
+
 ## Development
 
 Lint, format, dan tes pakai perkakas Astral (`ruff` + `pytest`, dikelola `uv`):

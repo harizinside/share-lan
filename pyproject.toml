@@ -1,6 +1,6 @@
 [project]
 name = "share-lan"
-version = "1.0.0"
+version = "0.0.1"
 description = "Bagi file ke satu jaringan WiFi/LAN — penerima tinggal scan QR atau ketik IP + kode 4 digit"
 requires-python = ">=3.9"
 dependencies = ["qrcode", "pillow"]
