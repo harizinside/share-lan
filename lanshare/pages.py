@@ -115,6 +115,13 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
   opacity:0;transition:opacity .25s}
 .tb.on{opacity:1}
 .tb.pdf{object-position:top;background:#fff}
+/* video preview pas hover (kayak YouTube) */
+.vp{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;transition:opacity .25s;pointer-events:none;background:#000}
+.ph:hover .vp,.thumb:hover .vp{opacity:1}
+.ph:hover .tb,.thumb:hover .tb{opacity:0}
+.vp.on{opacity:1}
+@media (hover:none){.vp{display:none}}
 .row .name{flex:1;min-width:0;font-weight:550;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
 .row .meta{color:var(--muted);font-size:12.5px;flex:none}
@@ -394,9 +401,43 @@ const escA = s => esc(s).replace(/"/g,"&quot;");
 /* Lazy-load bawaan browser: kalau thumbnail gagal, <img> dibuang dan ikonnya
    yang keliatan lagi - jadi nggak ada state kosong. */
 const isPdf = e => !e.dir && /\.pdf$/i.test(e.name);
-const thumbTag = e => (CFG.thumbs && (e.kind === "image" || (CFG.pdfThumbs && isPdf(e))))
-  ? `<img class="tb${isPdf(e)?' pdf':''}" loading="lazy" decoding="async" alt="" src="/thumb?p=${enc(e.path)}"
-       onload="this.classList.add('on')" onerror="this.remove()">` : "";
+const isVideo = e => !e.dir && e.kind === "video";
+const thumbTag = e => {
+  const img = (CFG.thumbs && (e.kind === "image" || (CFG.pdfThumbs && isPdf(e))))
+    ? `<img class="tb${isPdf(e)?' pdf':''}" loading="lazy" decoding="async" alt="" src="/thumb?p=${enc(e.path)}"
+         onload="this.classList.add('on')" onerror="this.remove()">` : "";
+  const v = isVideo(e)
+    ? `<video class="vp" preload="metadata" muted loop playsinline data-src="/dl?p=${enc(e.path)}"></video>`
+    : "";
+  return img + v;
+};
+
+/* Video preview ala YouTube: play muted selagi di-hover, berhenti pas ditinggal.
+   Delegated biar element yang baru di-render langsung kena. */
+let preview = null;
+function startPreview(host){
+  const v = host.querySelector("video.vp");
+  if(!v || !v.dataset.src || preview === v) return;
+  stopPreview();
+  preview = v;
+  if(!v.src) v.src = v.dataset.src;
+  v.currentTime = 0.5;
+  v.play().catch(()=>{});
+}
+function stopPreview(){
+  if(!preview) return;
+  const v = preview; preview = null;
+  try{ v.pause(); }catch(e){}
+}
+document.addEventListener("mouseover", ev=>{
+  const host = ev.target.closest(".ph,.thumb");
+  if(host) startPreview(host);
+});
+document.addEventListener("mouseout", ev=>{
+  const host = ev.target.closest(".ph,.thumb");
+  if(!host){ stopPreview(); return; }
+  if(!host.contains(ev.relatedTarget)) stopPreview();
+});
 
 function syncUpload(){
   const ub=$("#ub"); if(!ub) return;
