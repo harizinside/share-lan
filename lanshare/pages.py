@@ -238,11 +238,15 @@ const P = {
   audio:'<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
   archive:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M12 4v5m-1.5 3h3m-3 3h3"/>',
   doc:  '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  xls:  '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8 13h8M8 17h8M12 13v4"/>',
+  ppt:  '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 16.5v-3m3 3v-5m3 5V9.5"/>',
+  sql:  '<ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v14c0 1.66 3.13 3 7 3s7-1.34 7-3V5"/><path d="M5 12c0 1.66 3.13 3 7 3s7-1.34 7-3"/>',
   code: '<path d="m9 8-5 4 5 4M15 8l5 4-5 4"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
 };
 const TINT = {dir:"var(--accent)", image:"#e8735a", video:"#c07bff", audio:"#3aa6a0",
-              archive:"#d99a2b", doc:"#4a8ef0", code:"#5bbf6a", file:"var(--muted)"};
+              archive:"#d99a2b", doc:"#4a8ef0", xls:"#27a844", ppt:"#f47a3c", sql:"#3aa6d6",
+              code:"#5bbf6a", file:"var(--muted)"};
 const ico = (k, cls) => `<svg class="${cls||'ic'}" viewBox="0 0 24 24" stroke="${TINT[k]||TINT.file}">${P[k]||P.file}</svg>`;
 const UI = {
   qr:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2M14 21h1"/></svg>',

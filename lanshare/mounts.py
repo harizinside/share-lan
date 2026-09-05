@@ -153,21 +153,16 @@ def kind_of(name, is_dir):
         return "video"
     if ext in AUDIO_EXT:
         return "audio"
-    if ext in {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".dmg", ".iso"}:
+    if ext in {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".dmg", ".iso",
+               ".pkg", ".deb", ".rpm", ".exe", ".msi", ".apk", ".appimage"}:
         return "archive"
-    if ext in {
-        ".pdf",
-        ".doc",
-        ".docx",
-        ".xls",
-        ".xlsx",
-        ".ppt",
-        ".pptx",
-        ".txt",
-        ".md",
-        ".csv",
-        ".rtf",
-    }:
+    if ext in {".xls", ".xlsx", ".xlsm", ".csv", ".ods"}:
+        return "xls"
+    if ext in {".ppt", ".pptx", ".pptm", ".odp"}:
+        return "ppt"
+    if ext in {".sql", ".db", ".sqlite", ".sqlite3", ".db3", ".dbf"}:
+        return "sql"
+    if ext in {".pdf", ".doc", ".docx", ".docm", ".odt", ".txt", ".md", ".rtf"}:
         return "doc"
     if ext in {
         ".py",
@@ -190,7 +185,6 @@ def kind_of(name, is_dir):
         ".yml",
         ".yaml",
         ".toml",
-        ".sql",
     }:
         return "code"
     return "file"
