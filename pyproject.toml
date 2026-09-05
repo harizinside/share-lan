@@ -9,6 +9,9 @@ dependencies = [
     "pypdfium2>=4.30,<6",
 ]
 
+[project.optional-dependencies]
+viewer = ["groupdocs-viewer-net"]
+
 [project.scripts]
 sharelan = "lanshare.cli:main"
 lanshare = "lanshare.cli:main"

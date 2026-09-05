@@ -13,6 +13,7 @@ U = importlib.import_module("lanshare.update")
 def installed(monkeypatch):
     monkeypatch.setattr(U, "distribution", lambda _: SimpleNamespace(read_text=lambda _: "{}"))
     monkeypatch.setattr(U.importlib.util, "find_spec", lambda _: object())
+    monkeypatch.setattr(U, "latest_release_tag", lambda: "v9.9.9")
 
 
 def test_update_dispatch(monkeypatch):
@@ -37,7 +38,7 @@ def test_pip_targets_current_python(installed, monkeypatch):
     )
     assert U.update() == 0
     assert calls[0][:4] == [U.sys.executable, "-m", "pip", "install"]
-    assert calls[0][-1] == U.SOURCE_URL
+    assert calls[0][-1] == f"https://github.com/{U.REPO}/archive/refs/tags/v9.9.9.tar.gz"
 
 
 def test_uv_fallback(installed, monkeypatch):
@@ -66,3 +67,14 @@ def test_editable_untouched(monkeypatch):
 def test_failure_propagates(installed, monkeypatch):
     monkeypatch.setattr(U.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 2))
     assert U.update() == 2
+
+
+def test_release_lookup_failure_stops_before_install(monkeypatch):
+    monkeypatch.setattr(U, "distribution", lambda _: SimpleNamespace(read_text=lambda _: "{}"))
+
+    def boom():
+        raise U.urllib.error.URLError("nggak nyampe")
+
+    monkeypatch.setattr(U, "latest_release_tag", boom)
+    monkeypatch.setattr(U.subprocess, "run", lambda *a, **kw: pytest.fail("must not install"))
+    assert U.update() == 1

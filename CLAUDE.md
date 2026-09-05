@@ -22,10 +22,13 @@ uv run lanshare ~/some/file.txt      # run the server (console-script from pypro
 uv tool install --editable . && lanshare ...   # install once, then call `lanshare` from anywhere
 ```
 
-Runtime deps (`qrcode`, `pillow`) and dev deps (`pytest`, `ruff`) both live in `pyproject.toml`
-(`[project.dependencies]` and the `dev` dependency-group respectively) — there's no separate
-PEP 723 header to keep in sync anymore. Pillow is optional at runtime: guarded by `HAVE_PIL`
-(defined in `lanshare/thumb.py`), thumbnails just no-op without it.
+Runtime deps (`qrcode`, `pillow`, `pypdfium2`) and dev deps (`pytest`, `ruff`) both live in
+`pyproject.toml` (`[project.dependencies]` and the `dev` dependency-group respectively) — there's
+no separate PEP 723 header to keep in sync anymore. Pillow (thumbnails) and pypdfium2 (PDF
+thumbnails) are guarded at import time by `HAVE_PIL`/`HAVE_PDF` in `lanshare/thumb.py` and no-op
+without them. `groupdocs-viewer-net` (Office-document `/preview` rendering) is a true optional
+extra — `[project.optional-dependencies] viewer` — installed via `uv run --extra viewer`; guarded
+by `HAVE_GROUPDOCS` in `lanshare/preview.py`.
 
 ## Architecture
 
@@ -42,11 +45,13 @@ a strict DAG (no cycles) — each row only imports from rows above it:
 | `thumb.py` | `HAVE_PIL` + checksums (`crc32_of`, `sha256_of`) + in-memory thumbnail cache |
 | `banner.py` | The terminal banner printed on startup / `qr` console command |
 | `ziputil.py` | The resumable-ZIP engine (byte-exact plan + emit) |
+| `preview.py` | `/preview` document rendering — GroupDocs.Viewer for Office formats when installed (optional `viewer` extra), guarded by `HAVE_GROUPDOCS` |
 | `pages.py` | All served HTML/CSS/JS as inline string templates |
 | `auth.py` | 4-digit code auth, session cookies, brute-force lockout |
 | `console.py` | The interactive `ls`/`rm`/`qr`/`q` REPL on stdin |
 | `httpserver.py` | `Handler`/`Server` — the actual HTTP routing |
 | `cli.py` | argparse, `configure()`, `main()` |
+| `update.py` | `sharelan update` — reinstalls from the latest tagged GitHub release via pip/uv |
 
 `lanshare/__init__.py` re-exports the public surface of all of the above (with `__all__`, so ruff
 doesn't flag the re-exports as unused) — this is what `tests/conftest.py`'s `import lanshare as L`

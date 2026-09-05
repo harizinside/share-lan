@@ -185,7 +185,7 @@ Abis itu tinggal panggil `sharelan` (atau alias lama `lanshare`) dari terminal m
 
 ### Update aplikasi
 
-Mulai v0.0.2, update instalasi yang sudah ada ke versi terbaru di branch `main`:
+Mulai v0.0.2, update instalasi yang sudah ada ke rilis GitHub terbaru:
 
 ```bash
 sharelan update

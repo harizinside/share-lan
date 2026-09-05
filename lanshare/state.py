@@ -27,7 +27,7 @@ class State:
         self.mounts = {}  # nama tampilan -> path absolut di disk
         self.code = ""
         self.sessions = {}  # token -> waktu kedaluwarsa
-        self.fails = {}  # ip -> [gagal, dikunci_sampai, ronde]
+        self.fails = {}  # ip -> [gagal, dikunci_sampai, ronde, terakhir_dicoba]
         self.global_fails = 0
         self.initial_path = ""
         self.single_file = None

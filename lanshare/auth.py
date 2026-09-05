@@ -5,6 +5,8 @@ from .banner import print_banner
 from .fmt import C
 from .state import SESSION_TTL, ST
 
+FAILS_STALE_TTL = 3600  # ip yang udah lama nggak nyoba lagi (dan nggak lagi dikunci) dibuang
+
 
 def new_code(length):
     return "".join(str(secrets.randbelow(10)) for _ in range(length))
@@ -54,7 +56,16 @@ def check_code(ip, given):
 
     rotated = False
     with ST.lock:
-        rec = ST.fails.setdefault(ip, [0, 0.0, 0])
+        now = time.time()
+        stale = [
+            k
+            for k, r in ST.fails.items()
+            if k != ip and r[1] < now and now - r[3] > FAILS_STALE_TTL
+        ]
+        for k in stale:
+            del ST.fails[k]
+        rec = ST.fails.setdefault(ip, [0, 0.0, 0, now])
+        rec[3] = now
         rec[0] += 1
         ST.global_fails += 1
         if rec[0] >= 5:
@@ -70,6 +81,7 @@ def check_code(ip, given):
         if ST.global_fails >= 50:
             ST.global_fails = 0
             ST.code = new_code(ST.cfg.code_len)
+            ST.sessions.clear()  # kode diganti karena dicurigai diserang - sesi lama ikut dicabut
             rotated = True
     if rotated:
         print(f"\n  {C.warn('⚠')} Kebanyakan tebakan salah. Kode diganti otomatis.\n", flush=True)

@@ -28,6 +28,17 @@ wheels = [
 ]
 
 [[package]]
+name = "groupdocs-viewer-net"
+version = "26.5.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0e/32/74ed824d4804f163dd207f3935f7f0cc08514d7c653004c4fc044a59fb4d/groupdocs_viewer_net-26.5.0-py3-none-macosx_10_14_x86_64.whl", hash = "sha256:abedd90141d3557f5020eacd988cb999a624d5871b80eeb162984deddf9e7744", size = 179882903, upload-time = "2026-05-21T09:12:19.284Z" },
+    { url = "https://files.pythonhosted.org/packages/08/1f/683eff599de288e56328ed4f6a3aca22326824720690d3089a606e1d42dc/groupdocs_viewer_net-26.5.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:5a3e96ca0948a346504096397830fbb42bd341b14cfc059dc673d05ddb77be63", size = 177412671, upload-time = "2026-05-21T09:12:25.39Z" },
+    { url = "https://files.pythonhosted.org/packages/05/2a/541fa8125ee61caec6207c44e64ac9e9b567aba6aa62a8111fb4876b9f50/groupdocs_viewer_net-26.5.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:964285ea577b717787ea3a58bcae0de3cfca0cfedc4a40c98eb7ed297310d9d2", size = 177615251, upload-time = "2026-05-21T09:12:32.583Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/a9/44f9d9c7381b7076e7b664f007800b292ea4621eb42bfaa9df63c6fafbfb/groupdocs_viewer_net-26.5.0-py3-none-win_amd64.whl", hash = "sha256:5522edcba3f683a10bba1d87d9c99a05a342b224a4060559077196eef7e44057", size = 170838073, upload-time = "2026-05-21T09:12:39.41Z" },
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -410,6 +421,11 @@ dependencies = [
     { name = "qrcode" },
 ]
 
+[package.optional-dependencies]
+viewer = [
+    { name = "groupdocs-viewer-net" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -419,10 +435,12 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "groupdocs-viewer-net", marker = "extra == 'viewer'" },
     { name = "pillow" },
     { name = "pypdfium2", specifier = ">=4.30,<6" },
     { name = "qrcode" },
 ]
+provides-extras = ["viewer"]
 
 [package.metadata.requires-dev]
 dev = [

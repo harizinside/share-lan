@@ -52,7 +52,7 @@ def parse_args(argv=None):
         "  lanshare ~/Desktop/video.mp4\n"
         "  lanshare ~/Documents ~/Foto\\ Liburan/ laporan.pdf\n"
         "  lanshare . --read-only --code 1234\n"
-        "  sharelan update                      # update instalasi dari GitHub main\n"
+        "  sharelan update                      # update instalasi ke rilis GitHub terbaru\n"
         "  sharelan ./update                    # bagikan folder bernama update\n"
         "\n"
         "Sambil server jalan, seret file/folder ke terminal + Enter buat nambahin.\n"
@@ -111,7 +111,7 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv[:1] == ["update"]:
         parser = argparse.ArgumentParser(
-            prog="sharelan update", description="Update aplikasi dari GitHub main."
+            prog="sharelan update", description="Update aplikasi ke rilis GitHub terbaru."
         )
         parser.parse_args(argv[1:])
         return update()
