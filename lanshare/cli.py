@@ -13,6 +13,7 @@ from .httpserver import Handler, Server
 from .mounts import build_mounts, recompute
 from .network import find_addresses
 from .state import ST
+from .update import installed_version, update
 
 
 def bind_server(host, port):
@@ -51,10 +52,13 @@ def parse_args(argv=None):
         "  lanshare ~/Desktop/video.mp4\n"
         "  lanshare ~/Documents ~/Foto\\ Liburan/ laporan.pdf\n"
         "  lanshare . --read-only --code 1234\n"
+        "  sharelan update                      # update instalasi dari GitHub main\n"
+        "  sharelan ./update                    # bagikan folder bernama update\n"
         "\n"
         "Sambil server jalan, seret file/folder ke terminal + Enter buat nambahin.\n"
         "Ketik ? di situ buat lihat perintah lain (ls, rm, qr, q).\n",
     )
+    ap.add_argument("--version", action="version", version=f"sharelan {installed_version()}")
     ap.add_argument(
         "paths",
         nargs="*",
@@ -104,6 +108,13 @@ def main(argv=None):
         sys.stdout.reconfigure(line_buffering=True)  # banner langsung nongol walau di-pipe
     except Exception:
         pass
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["update"]:
+        parser = argparse.ArgumentParser(
+            prog="sharelan update", description="Update aplikasi dari GitHub main."
+        )
+        parser.parse_args(argv[1:])
+        return update()
     cfg = parse_args(argv)
     configure(cfg)
 

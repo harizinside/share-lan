@@ -50,10 +50,13 @@ $VenvLanshare = Join-Path $VenvDir "Scripts\lanshare.exe"
 
 Write-Host "-> Install lanshare dari $RepoTarball"
 & $VenvPip install --quiet --upgrade pip
+if ($LASTEXITCODE -ne 0) { throw "Gagal update pip." }
 & $VenvPip install --quiet --upgrade --force-reinstall $RepoTarball
+if ($LASTEXITCODE -ne 0) { throw "Gagal install sharelan." }
 
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 Copy-Item -Force $VenvLanshare (Join-Path $BinDir "lanshare.exe")
+Copy-Item -Force (Join-Path $VenvDir "Scripts\sharelan.exe") (Join-Path $BinDir "sharelan.exe")
 
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if (($UserPath -split ";") -notcontains $BinDir) {
@@ -66,4 +69,4 @@ $env:Path = "$env:Path;$BinDir"
 Write-Host ""
 Write-Host "lanshare kepasang di $BinDir\lanshare.exe" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Coba: lanshare --help"
+Write-Host "  Coba: sharelan --help (update: sharelan update)"

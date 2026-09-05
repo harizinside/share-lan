@@ -181,8 +181,24 @@ Windows (PowerShell):
 powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/harizinside/share-lan/main/install.ps1 | iex"
 ```
 
-Abis itu tinggal panggil `lanshare` dari terminal manapun. Jalanin lagi installer-nya kapan aja
-buat update ke versi terbaru di branch `main`.
+Abis itu tinggal panggil `sharelan` (atau alias lama `lanshare`) dari terminal manapun.
+
+### Update aplikasi
+
+Mulai v0.0.2, update instalasi yang sudah ada ke versi terbaru di branch `main`:
+
+```bash
+sharelan update
+sharelan --version
+```
+
+`lanshare update` juga bisa. Kalau masih pakai v0.0.1, jalankan ulang installer
+satu baris di atas sekali untuk mendapatkan command baru ini.
+Update memakai Python instalasi yang sedang dijalankan; butuh koneksi internet.
+Setelah selesai, jalankan ulang server agar kode baru dipakai.
+Instalasi editable dari repo: gunakan `git pull` lalu `uv sync`.
+Docker: gunakan `docker compose pull` lalu `docker compose up -d`.
+Untuk membagikan file/folder bernama `update`, tulis `sharelan ./update`.
 
 ## Jalan tanpa ngetik `uv run`
 

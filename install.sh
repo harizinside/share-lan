@@ -67,6 +67,7 @@ echo "→ Install lanshare dari $REPO_TARBALL"
 
 mkdir -p "$BIN_DIR"
 ln -sf "$VENV_DIR/bin/lanshare" "$BIN_DIR/lanshare"
+ln -sf "$VENV_DIR/bin/sharelan" "$BIN_DIR/sharelan"
 
 echo ""
 echo "✓ lanshare kepasang di $BIN_DIR/lanshare"
@@ -83,4 +84,4 @@ case ":$PATH:" in
 esac
 
 echo ""
-echo "  Coba: lanshare --help"
+echo "  Coba: sharelan --help (update: sharelan update)"
