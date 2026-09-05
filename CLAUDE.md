@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `share·lan` is a Python LAN file-sharing server, packaged as `lanshare/`. You point it at
 files/folders, it serves them over HTTP to anyone on the same WiFi/LAN via a 4-digit access code
-or QR scan — no cloud, no accounts, no client install. README.md (in Indonesian) is the
-user-facing doc; treat it as authoritative for behavior/UX decisions.
+or QR scan — no cloud, no accounts, no client install. README.md is the user-facing doc; treat it
+as authoritative for behavior/UX decisions. CLI/console/log output is English-only; the served web
+UI additionally supports a runtime English/Indonesian switcher (see `lanshare/i18n.py` below).
 
 ## Commands
 
@@ -38,6 +39,7 @@ a strict DAG (no cycles) — each row only imports from rows above it:
 | Module | Responsibility |
 |---|---|
 | `state.py` | Top-level constants and the single `State`/`ST` singleton (all cross-thread state) |
+| `i18n.py` | Loads `locales/*.json` into a translation table (`t()`, `get_lang()`, `LANGS`) for the recipient-facing web UI — English default, other languages optional and contributor-addable |
 | `fmt.py` | Size formatting, ANSI color helper `C`, `log`/`die` |
 | `qr.py` | QR matrix/SVG/ASCII rendering |
 | `network.py` | Picks which local IP to advertise (scores interfaces, prefers the default route) |
@@ -94,6 +96,15 @@ new cross-module call that tests might need to patch.
 - **Frontend** (`pages.py`: `page_html`, `login_page`) — the entire recipient-facing UI
   (HTML/CSS/JS) is generated as inline strings served from these functions; there's no separate
   static asset pipeline or build step.
+- **i18n** (`i18n.py`: `t()`, `get_lang()`, `flat_table()`, `LANGS`) — every recipient-facing
+  string (the JS SPA in `pages.py` plus the error/login messages `httpserver.py` sends via
+  `self.fail(status, key, **kwargs)`) is a translation key resolved against the `sl_lang` cookie
+  (default `en`). Translations live in `lanshare/locales/<code>.json` (flat `{key: string}` files,
+  `en.json` the required complete reference, others may be partial and fall back key-by-key to
+  English) — dropping in a new file adds a language with no code change, and `LANGS`/the header's
+  language-toggle button both reflect whatever files are present. The client embeds the same table
+  via `flat_table()` (next to `CFG`, the same way) so the JS SPA never duplicates strings.
+  CLI/console/banner output is not part of this system — it's plain, permanent English.
 - **Networking** (`network.py`: `find_addresses`, `_route_ip`, `_score`) — picks which local IP to
   advertise in the QR/banner among multiple interfaces (VPN/Docker/Tailscale can all present
   addresses), scoring candidates and preferring the one that matches the default route.

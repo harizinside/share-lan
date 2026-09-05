@@ -8,19 +8,19 @@ from .mounts import add_paths, dir_stats, remove_mount
 from .state import ST
 
 CONSOLE_HELP = """
-  Seret file/folder dari Finder ke jendela ini terus Enter buat nambahin.
-  Atau ketik path-nya langsung. Bisa beberapa sekaligus.
+  Drag a file/folder from Finder into this window then Enter to add it.
+  Or type the path directly. Multiple at once works too.
 
-    ls          lihat yang lagi dibagikan
-    rm <nama>   cabut satu (boleh pakai nomor urutnya, mis. rm 2)
-    qr          tampilkan ulang alamat + QR
-    q           matiin server
+    ls          show what's currently shared
+    rm <name>   remove one (you can use its list index, e.g. rm 2)
+    qr          reprint the address + QR
+    q           stop the server
 """
 
 
 def print_shared():
     if not ST.mounts:
-        print(f"\n  {C.dim('Belum ada yang dibagikan.')}\n")
+        print(f"\n  {C.dim('Nothing shared yet.')}\n")
         return
     print()
     for i, (name, full) in enumerate(ST.mounts.items(), 1):
@@ -34,8 +34,8 @@ def print_shared():
 
 
 def console_available():
-    """Aman baca stdin? Proses yang lagi di background nggak boleh baca dari terminal -
-    bisa kena SIGTTIN dan malah ngestop sendiri. Pipe/file aman-aman aja."""
+    """Safe to read stdin? A process running in the background must not read from the
+    terminal - it can get SIGTTIN and stop itself. Pipes/files are always fine."""
     if not sys.stdin or sys.stdin.closed:
         return False
     try:
@@ -47,13 +47,13 @@ def console_available():
 
 
 def console_loop(httpd):
-    """Baca perintah dari stdin sambil server jalan."""
+    """Read commands from stdin while the server is running."""
     while True:
-        # readline(), bukan `for x in sys.stdin` - iterasi file object nge-buffer
-        # dan barisnya bisa nyangkut sampai buffer penuh.
+        # readline(), not `for x in sys.stdin` - iterating a file object buffers
+        # and lines can be stuck waiting until the buffer fills up.
         raw = sys.stdin.readline()
         if not raw:
-            return  # stdin ketutup: server tetap jalan, cuma nggak bisa diperintah
+            return  # stdin closed: the server keeps running, just can't take commands
         line = raw.strip()
         if not line:
             continue
@@ -71,29 +71,27 @@ def console_loop(httpd):
             elif low.startswith("rm "):
                 name = remove_mount(line[3:].strip())
                 if name:
-                    print(f"  {C.warn('−')} {name} {C.dim('dicabut')}")
+                    print(f"  {C.warn('−')} {name} {C.dim('removed')}")
                     print_shared()
                 else:
-                    print(f"  {C.bad('✗')} Nggak ketemu: {line[3:].strip()}")
+                    print(f"  {C.bad('✗')} Not found: {line[3:].strip()}")
             else:
                 try:
                     tokens = shlex.split(line)
                 except ValueError:
-                    tokens = [line]  # kutip nggak seimbang: anggap satu path apa adanya
+                    tokens = [line]  # unbalanced quotes: treat the whole line as one path
                 added, skipped, bad = add_paths(tokens)
                 for name, full in added:
                     count, size, _ = dir_stats(full, budget=0.4)
                     info = f"{count} file, {human(size)}" if os.path.isdir(full) else human(size)
                     print(f"  {C.ok('+')} {name}  {C.dim('(' + info + ')')}")
                 for raw_path in skipped:
-                    print(f"  {C.dim('·')} {C.dim(raw_path + ' udah dibagikan')}")
+                    print(f"  {C.dim('·')} {C.dim(raw_path + ' already shared')}")
                 for raw_path, why in bad:
                     print(f"  {C.bad('✗')} {raw_path}  {C.dim('(' + why + ')')}")
                 if added:
                     total = len(ST.mounts)
-                    print(
-                        f"  {C.dim(f'Sekarang {total} item dibagikan. Yang lagi buka halamannya')}"
-                    )
-                    print(f"  {C.dim('bakal lihat sendiri dalam beberapa detik.')}")
-        except Exception as e:  # konsol nggak boleh sampai matiin server
+                    print(f"  {C.dim(f'Now sharing {total} item(s). Anyone with the page open')}")
+                    print(f"  {C.dim('will see it within a few seconds.')}")
+        except Exception as e:  # the console must never take the server down with it
             print(f"  {C.bad('✗')} {e}")

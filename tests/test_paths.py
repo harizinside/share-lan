@@ -1,4 +1,4 @@
-"""Tes keamanan path: apa pun yang dikirim penerima nggak boleh nembus keluar mount."""
+"""Path security tests: nothing a recipient sends should ever escape a mount."""
 
 import argparse
 import os
@@ -11,64 +11,66 @@ import lanshare as L
 @pytest.fixture
 def mounted(tree):
     L.ST.cfg = argparse.Namespace(hidden=False)
-    L.ST.mounts = L.build_mounts([str(tree / "Dokumen"), str(tree / "klip.mp4")])
+    L.ST.mounts = L.build_mounts([str(tree / "Documents"), str(tree / "clip.mp4")])
     return tree
 
 
 @pytest.mark.parametrize(
     "p",
     [
-        "Dokumen/../../etc/passwd",
-        "Dokumen/../../../../../../etc/passwd",
-        "Dokumen/..",
-        "Dokumen/arsip/../../..",
-        "Dokumen/./../..",
+        "Documents/../../etc/passwd",
+        "Documents/../../../../../../etc/passwd",
+        "Documents/..",
+        "Documents/archive/../../..",
+        "Documents/./../..",
     ],
 )
-def test_tolak_yang_keluar_mount(mounted, p):
+def test_rejects_path_outside_mount(mounted, p):
     with pytest.raises(L.Denied):
         L.resolve(p)
 
 
-@pytest.mark.parametrize("p", ["/etc/passwd", "gaib", "gaib/apa", "etc"])
-def test_mount_yang_gak_ada(mounted, p):
+@pytest.mark.parametrize("p", ["/etc/passwd", "ghost", "ghost/whatever", "etc"])
+def test_unknown_mount(mounted, p):
     with pytest.raises(L.Missing):
         L.resolve(p)
 
 
-def test_symlink_yang_nunjuk_keluar_ditolak(mounted):
-    link = mounted / "Dokumen" / "tembus"
+def test_symlink_pointing_outside_rejected(mounted):
+    link = mounted / "Documents" / "escape"
     os.symlink("/etc", link)
     with pytest.raises(L.Denied):
-        L.resolve("Dokumen/tembus/passwd")
+        L.resolve("Documents/escape/passwd")
 
 
-def test_path_wajar_tetap_jalan(mounted):
-    assert L.resolve("") is None  # root virtual = daftar mount
-    assert L.resolve("Dokumen") == str(mounted / "Dokumen")
-    assert L.resolve("Dokumen/arsip/kopi ☕.txt") == str(mounted / "Dokumen/arsip/kopi ☕.txt")
-    assert L.resolve("/Dokumen/") == str(mounted / "Dokumen")
+def test_normal_path_still_works(mounted):
+    assert L.resolve("") is None  # virtual root = the mount list
+    assert L.resolve("Documents") == str(mounted / "Documents")
+    assert L.resolve("Documents/archive/coffee ☕.txt") == str(
+        mounted / "Documents/archive/coffee ☕.txt"
+    )
+    assert L.resolve("/Documents/") == str(mounted / "Documents")
 
 
-def test_dotfile_disembunyiin_secara_default(mounted):
-    names = [e["name"] for e in L.list_entries("Dokumen", L.resolve("Dokumen"))]
-    assert ".rahasia" not in names
-    assert "catatan.txt" in names
+def test_dotfiles_hidden_by_default(mounted):
+    names = [e["name"] for e in L.list_entries("Documents", L.resolve("Documents"))]
+    assert ".secret" not in names
+    assert "notes.txt" in names
 
 
-def test_hidden_bisa_dinyalain(mounted):
+def test_hidden_can_be_enabled(mounted):
     L.ST.cfg = argparse.Namespace(hidden=True)
-    names = [e["name"] for e in L.list_entries("Dokumen", L.resolve("Dokumen"))]
-    assert ".rahasia" in names
+    names = [e["name"] for e in L.list_entries("Documents", L.resolve("Documents"))]
+    assert ".secret" in names
 
 
-def test_listing_folder_duluan_baru_file(mounted):
-    entries = L.list_entries("Dokumen", L.resolve("Dokumen"))
+def test_listing_folders_before_files(mounted):
+    entries = L.list_entries("Documents", L.resolve("Documents"))
     kinds = [e["dir"] for e in entries]
     assert kinds == sorted(kinds, reverse=True)
 
 
-def test_file_part_gak_ikut_kelisting(mounted):
-    (mounted / "Dokumen" / "lagi-upload.part").write_text("belum kelar")
-    names = [e["name"] for e in L.list_entries("Dokumen", L.resolve("Dokumen"))]
-    assert "lagi-upload.part" not in names
+def test_part_files_excluded_from_listing(mounted):
+    (mounted / "Documents" / "in-progress.part").write_text("not finished yet")
+    names = [e["name"] for e in L.list_entries("Documents", L.resolve("Documents"))]
+    assert "in-progress.part" not in names

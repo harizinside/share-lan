@@ -15,7 +15,7 @@ def qr_svg(data, box=8):
     n = len(m)
     side = n * box
     rects = []
-    for y, row in enumerate(m):  # gabungin kotak sebaris jadi satu rect
+    for y, row in enumerate(m):  # merge adjacent boxes in a row into a single rect
         x = 0
         while x < n:
             if row[x]:

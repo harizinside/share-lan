@@ -1,6 +1,6 @@
-# Di bawah ambang: CRC dihitung duluan, jadi seluruh layout byte bisa dipetakan
-# persis -> Content-Length ketauan -> Range jalan -> ZIP-nya bisa di-resume.
-# Di atas ambang: streaming biasa, cepat mulai tapi nggak bisa dilanjut.
+# Below the threshold: CRCs are precomputed, so the exact byte layout can be
+# mapped -> Content-Length is known -> Range works -> the ZIP is resumable.
+# Above the threshold: plain streaming, starts fast but can't be resumed.
 
 import os
 import struct
@@ -13,7 +13,7 @@ from .thumb import crc32_of
 
 
 class Stale(Exception):
-    """File berubah di tengah jalan - lebih baik putus daripada ngirim ZIP korup."""
+    """File changed mid-transfer - better to abort than send a corrupt ZIP."""
 
 
 def dos_time(ts):
@@ -126,7 +126,7 @@ def _end_record(count, cd_size, cd_offset):
 
 
 def build_zip_plan(entries, on_progress=None):
-    """[(kind, ...)] + total byte. kind 'b' = bytes literal, 'f' = potongan file."""
+    """[(kind, ...)] + total bytes. kind 'b' = literal bytes, 'f' = a file chunk."""
     segments = []
     central = []
     offset = 0
@@ -159,7 +159,7 @@ def build_zip_plan(entries, on_progress=None):
 
 
 def emit_plan(segments, start, end, put_bytes, put_file):
-    """Kirim byte [start, end) dari rencana ZIP."""
+    """Send bytes [start, end) from the ZIP plan."""
     pos = 0
     for seg in segments:
         length = len(seg[1]) if seg[0] == "b" else seg[2]
@@ -178,7 +178,7 @@ def emit_plan(segments, start, end, put_bytes, put_file):
 
 
 class StreamWriter:
-    """Objek tulis tanpa seek/tell - zipfile otomatis pakai mode data descriptor."""
+    """A write-only object with no seek/tell - zipfile automatically uses data-descriptor mode."""
 
     def __init__(self, wfile):
         self.wfile = wfile

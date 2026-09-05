@@ -1,9 +1,9 @@
-"""LAN Share - drop path apa aja, orang lain tinggal scan & download.
+"""LAN Share - drop any path, anyone else just scans & downloads.
 
-    uv run lanshare ~/Desktop/video.mp4 ~/Foto\\ Liburan/
+    uv run lanshare ~/Desktop/video.mp4 ~/Holiday\\ Photos/
 
-Seret file/folder dari Finder ke terminal buat nempelin path-nya.
-Penerima buka IP + kode 4 digit, atau tinggal scan QR.
+Drag a file/folder from Finder into the terminal to paste its path.
+Recipients open the IP + a 4-digit code, or just scan the QR.
 """
 
 from .auth import check_code, lock_left, new_code, new_session, valid_session
@@ -12,6 +12,7 @@ from .cli import bind_server, configure, keep_awake, main, parse_args
 from .console import console_available, console_loop, print_shared
 from .fmt import C, die, human, log, parse_size
 from .httpserver import Handler, Server, parse_range, unique_path
+from .i18n import DEFAULT_LANG, LANGS, get_lang, t
 from .mounts import (
     Denied,
     Missing,
@@ -41,11 +42,13 @@ from .ziputil import Stale, StreamWriter, build_zip_plan, emit_plan, zip_entries
 
 __all__ = [
     "C",
+    "DEFAULT_LANG",
     "Denied",
     "DOC_EXT",
     "HAVE_PIL",
     "HAVE_GROUPDOCS",
     "Handler",
+    "LANGS",
     "Missing",
     "ST",
     "Server",
@@ -68,6 +71,7 @@ __all__ = [
     "entry_of",
     "file_key",
     "find_addresses",
+    "get_lang",
     "human",
     "keep_awake",
     "kind_of",
@@ -97,6 +101,7 @@ __all__ = [
     "safe_upload_name",
     "sha256_of",
     "share_url",
+    "t",
     "total_stats",
     "unique_name",
     "unique_path",

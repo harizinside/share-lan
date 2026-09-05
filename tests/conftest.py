@@ -1,4 +1,4 @@
-"""Fixture bersama: bikin folder contoh dan nyalain server beneran di port acak."""
+"""Shared fixtures: build a sample folder tree and start a real server on a random port."""
 
 import http.client
 import os
@@ -11,30 +11,30 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import lanshare as L
 
-L.fmt.log = lambda *a, **k: None  # log server nggak perlu berisik di output tes
+L.fmt.log = lambda *a, **k: None  # the server's logging doesn't need to be noisy in test output
 
 
 @pytest.fixture
 def tree(tmp_path):
-    """Folder contoh: campur file, subfolder, unicode, dotfile, basename kembar."""
-    (tmp_path / "Dokumen" / "arsip").mkdir(parents=True)
-    (tmp_path / "Galeri").mkdir()
-    (tmp_path / "lain").mkdir()
-    (tmp_path / "Dokumen" / "catatan.txt").write_bytes(b"halo dunia\n" * 50)
-    (tmp_path / "Dokumen" / "data.bin").write_bytes(bytes(range(256)) * 400)
-    (tmp_path / "Dokumen" / "arsip" / "kopi ☕.txt").write_text("unicode ok")
-    (tmp_path / "Dokumen" / ".rahasia").write_text("jangan ikut")
-    (tmp_path / "lain" / "catatan.txt").write_text("versi lain")
-    (tmp_path / "klip.mp4").write_bytes(b"\x00\x01\x02\x03" * 5000)
+    """Sample folder tree: mixed files, subfolders, unicode, a dotfile, duplicate basenames."""
+    (tmp_path / "Documents" / "archive").mkdir(parents=True)
+    (tmp_path / "Gallery").mkdir()
+    (tmp_path / "other").mkdir()
+    (tmp_path / "Documents" / "notes.txt").write_bytes(b"hello world\n" * 50)
+    (tmp_path / "Documents" / "data.bin").write_bytes(bytes(range(256)) * 400)
+    (tmp_path / "Documents" / "archive" / "coffee ☕.txt").write_text("unicode ok")
+    (tmp_path / "Documents" / ".secret").write_text("do not include")
+    (tmp_path / "other" / "notes.txt").write_text("other version")
+    (tmp_path / "clip.mp4").write_bytes(b"\x00\x01\x02\x03" * 5000)
     if L.HAVE_PIL:
         from PIL import Image
 
-        Image.new("RGB", (400, 300), (200, 80, 90)).save(tmp_path / "Galeri" / "foto.jpg")
+        Image.new("RGB", (400, 300), (200, 80, 90)).save(tmp_path / "Gallery" / "photo.jpg")
     return tmp_path
 
 
 class Client:
-    """Klien HTTP kecil biar bisa ngatur header dan cookie sendiri."""
+    """A small HTTP client so tests can control their own headers and cookies."""
 
     def __init__(self, port):
         self.port = port
@@ -69,7 +69,7 @@ class Client:
 
 
 def start(tmp_paths, extra=None):
-    """Nyalain server di port acak dengan konfigurasi tertentu."""
+    """Start a server on a random port with a given configuration."""
     argv = [str(p) for p in tmp_paths] + ["--code", "4815", "--no-qr"] + (extra or [])
     cfg = L.parse_args(argv)
     cfg.port = 0
@@ -81,7 +81,7 @@ def start(tmp_paths, extra=None):
     httpd = L.Server(("127.0.0.1", 0), L.Handler)
     port = httpd.server_address[1]
     L.ST.base_url = f"http://127.0.0.1:{port}"
-    # poll cepet: shutdown() default nunggu 0.5 detik per server, kali puluhan tes
+    # fast polling: shutdown() otherwise waits up to 0.5s per server, times dozens of tests
     thread = threading.Thread(
         target=httpd.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
     )
@@ -91,7 +91,9 @@ def start(tmp_paths, extra=None):
 
 @pytest.fixture
 def server(tree):
-    httpd, client = start([tree / "Dokumen", tree / "Galeri", tree / "lain", tree / "klip.mp4"], [])
+    httpd, client = start(
+        [tree / "Documents", tree / "Gallery", tree / "other", tree / "clip.mp4"], []
+    )
     yield client
     httpd.shutdown()
     httpd.server_close()

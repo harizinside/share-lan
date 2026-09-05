@@ -1,25 +1,25 @@
-# Sample docker-compose config buat jalanin share-lan lewat Docker.
+# Sample docker-compose config for running share-lan via Docker.
 #
-# Sebelum start:
-#   mkdir -p shared && cp file-file-yang-mau-dibagi shared/
+# Before starting:
+#   mkdir -p shared && cp files-you-want-to-share shared/
 #   docker compose up -d
-#   docker compose logs -f   # buat lihat QR + kode 4 digit
+#   docker compose logs -f   # to see the QR code + 4-digit code
 #
-# Opsi lain yang bisa ditambahin ke `command:`:
-#   --read-only        matiin upload dari penerima
-#   --no-qr             jangan cetak QR di log
-#   --code 1234         pakai kode sendiri, bukan yang acak
-#   --max-upload 2G      batas ukuran per upload
+# Other options you can add to `command:`:
+#   --read-only        disable uploads from recipients
+#   --no-qr             don't print the QR code in the logs
+#   --code 1234         use your own code instead of a random one
+#   --max-upload 2G      per-upload size limit
 #
-# Catatan jaringan: default-nya cuma port 8000 yang di-publish, jadi share-lan
-# masih bisa jalan tapi alamat yang dia deteksi buat QR/banner adalah alamat
-# internal Docker, bukan IP LAN host. Kalau QR/`--ip` auto-detect nggak nyambung,
-# pakai `network_mode: host` di bawah (Linux only) biar dia lihat network host
-# beneran.
+# Networking note: by default only port 8000 is published, so share-lan still
+# runs fine but the address it detects for the QR/banner is Docker's internal
+# address, not the host's real LAN IP. If QR/`--ip` auto-detection doesn't
+# connect, use `network_mode: host` below (Linux only) so it sees the real
+# host network.
 services:
   lanshare:
     image: ghcr.io/harizinside/share-lan:latest
-    # Atau build dari source lokal, bukan pull dari GHCR:
+    # Or build from local source instead of pulling from GHCR:
     # build: .
     ports:
       - "8000:8000"
@@ -27,4 +27,4 @@ services:
       - ./shared:/data
     command: ["/data", "--code", "1234"]
     restart: unless-stopped
-    # network_mode: host   # uncomment (Linux) buat deteksi IP LAN yang akurat
+    # network_mode: host   # uncomment (Linux) for accurate LAN IP detection

@@ -23,21 +23,21 @@ def build_mounts(paths):
     for raw in paths:
         p = os.path.realpath(os.path.expanduser(raw))
         if not os.path.exists(p):
-            bad.append((raw, "nggak ada"))
+            bad.append((raw, "not found"))
             continue
         if not os.access(p, os.R_OK):
-            bad.append((raw, "nggak bisa dibaca"))
+            bad.append((raw, "not readable"))
             continue
         name = os.path.basename(p.rstrip(os.sep)) or p.replace(os.sep, "_")
         mounts[unique_name(name, mounts)] = p
     if bad:
         lines = "\n".join(f"      {C.bad(p)}  ({why})" for p, why in bad)
-        die(f"Path ini bermasalah, server nggak jalan:\n{lines}")
+        die(f"There's a problem with these paths, the server isn't starting:\n{lines}")
     return mounts
 
 
 def recompute():
-    """Dipanggil tiap daftar bagikan berubah: nentuin bentuk root."""
+    """Called whenever the shared list changes: works out the root's shape."""
     items = list(ST.mounts.items())
     ST.single_root = len(items) == 1 and os.path.isdir(items[0][1])
     ST.initial_path = items[0][0] if ST.single_root else ""
@@ -46,26 +46,26 @@ def recompute():
 
 
 def add_paths(raws):
-    """Tambahin path ke daftar bagikan sambil server jalan.
+    """Add paths to the shared list while the server is running.
 
-    Yang disimpan cuma path-nya. Nggak ada file yang disalin ke mana pun -
-    datanya dibaca langsung dari tempat aslinya pas ada yang download.
+    Only the path itself is stored. No file is ever copied anywhere - data is
+    read straight from its original location whenever someone downloads it.
     """
     added, skipped, bad = [], [], []
     with ST.lock:
-        punya = set(ST.mounts.values())
+        have = set(ST.mounts.values())
         for raw in raws:
             path = os.path.realpath(os.path.expanduser(raw))
             if not os.path.exists(path):
-                bad.append((raw, "nggak ada"))
+                bad.append((raw, "not found"))
             elif not os.access(path, os.R_OK):
-                bad.append((raw, "nggak bisa dibaca"))
-            elif path in punya:
+                bad.append((raw, "not readable"))
+            elif path in have:
                 skipped.append(raw)
             else:
                 name = unique_name(os.path.basename(path.rstrip(os.sep)) or path, ST.mounts)
                 ST.mounts[name] = path
-                punya.add(path)
+                have.add(path)
                 added.append((name, path))
     if added:
         recompute()
@@ -73,7 +73,7 @@ def add_paths(raws):
 
 
 def remove_mount(key):
-    """Cabut satu item dari daftar bagikan - lewat namanya atau nomor urutnya."""
+    """Remove one item from the shared list - by its name or its list index."""
     with ST.lock:
         names = list(ST.mounts)
         name = None
@@ -89,30 +89,30 @@ def remove_mount(key):
 
 
 class Denied(Exception):
-    """Path di luar mount - 403."""
+    """Path outside any mount - 403."""
 
 
 class Missing(Exception):
-    """Mount atau file nggak ketemu - 404."""
+    """Mount or file not found - 404."""
 
 
 def resolve(p):
-    """'<mount>/<sisa/path>' -> path absolut, dijamin masih di dalam mount-nya."""
+    """'<mount>/<rest/of/path>' -> absolute path, guaranteed to stay inside its mount."""
     p = (p or "").replace("\\", "/").strip("/")
     parts = [x for x in p.split("/") if x not in ("", ".")]
     if not parts:
-        return None  # root virtual = daftar mount
+        return None  # virtual root = the mount list
     base = ST.mounts.get(parts[0])
     if base is None:
         raise Missing(parts[0])
     target = os.path.realpath(os.path.join(base, *parts[1:])) if len(parts) > 1 else base
     if target != base and not target.startswith(base + os.sep):
-        raise Denied(p)  # nutup ../ sekaligus symlink yang nunjuk keluar
+        raise Denied(p)  # blocks both ../ and symlinks that point outside
     return target
 
 
 def can_upload_here(target):
-    """Target (hasil resolve) boleh dipakai buat nyimpen upload? None = root virtual."""
+    """Can this resolved target be used to store an upload? None = virtual root."""
     return (
         not ST.cfg.read_only
         and target is not None
@@ -207,7 +207,7 @@ def kind_of(name, is_dir):
 
 
 def list_entries(p, target):
-    """Daftar isi buat /api/list. p kosong = daftar mount."""
+    """Contents listing for /api/list. p empty = list of mounts."""
     out = []
     if target is None:
         for name, full in ST.mounts.items():
@@ -229,7 +229,7 @@ def list_entries(p, target):
 
 
 def walk_files(target, prefix=""):
-    """Semua file di bawah target, urut stabil. Yield (abspath, arcname)."""
+    """Every file under target, in stable order. Yields (abspath, arcname)."""
     if os.path.isfile(target):
         yield target, prefix or os.path.basename(target)
         return
@@ -245,7 +245,7 @@ def walk_files(target, prefix=""):
 
 
 def dir_stats(target, budget=2.0):
-    """(jumlah file, total byte, kepotong?) - dibatesin waktu biar startup nggak ngegantung."""
+    """(file count, total bytes, was it cut short?) - time-boxed so startup never hangs."""
     if os.path.isfile(target):
         try:
             return 1, os.path.getsize(target), False
@@ -269,7 +269,7 @@ def dir_stats(target, budget=2.0):
 
 
 def total_stats(target):
-    """Statistik buat keputusan ZIP. target None = semua mount."""
+    """Stats used to decide the ZIP strategy. target None = every mount."""
     if target is not None:
         return dir_stats(target)
     count = size = 0
@@ -283,7 +283,7 @@ def total_stats(target):
 
 
 def safe_upload_name(raw):
-    """Nama file dari luar itu nggak dipercaya sama sekali."""
+    """A filename from outside is never trusted at all."""
     name = urllib.parse.unquote(raw or "")
     name = name.replace("\\", "/").split("/")[-1]
     name = "".join(ch for ch in name if ch >= " " and ch != "\x7f")

@@ -1,7 +1,7 @@
 #!/bin/sh
-# Installer buat lanshare (share-lan) — macOS, Ubuntu, Fedora, dan Linux lain.
-# Cuma butuh Python (>=3.9) yang udah ada di sistem. Nggak install package
-# manager lain (uv, pipx, dll) dan nggak butuh git.
+# Installer for lanshare (share-lan) — macOS, Ubuntu, Fedora, and other Linux.
+# Only needs Python (>=3.9) already on the system. Doesn't install any other
+# package manager (uv, pipx, etc.) and doesn't need git.
 #
 #   curl -LsSf https://raw.githubusercontent.com/harizinside/share-lan/main/install.sh | sh
 
@@ -31,7 +31,7 @@ find_python() {
 }
 
 PYTHON=$(find_python) || {
-    echo "✗ Python 3.9+ nggak ketemu di sistem lu." >&2
+    echo "✗ Python 3.9+ was not found on your system." >&2
     echo "" >&2
     if command -v brew >/dev/null 2>&1 || [ "$(uname -s)" = "Darwin" ]; then
         echo "  macOS:  brew install python3" >&2
@@ -43,25 +43,25 @@ PYTHON=$(find_python) || {
         echo "  Fedora:  sudo dnf install python3 python3-pip" >&2
     fi
     echo "" >&2
-    echo "  Install Python dulu, terus jalanin lagi installer ini." >&2
+    echo "  Install Python first, then run this installer again." >&2
     exit 1
 }
 
-echo "→ Pakai $($PYTHON --version 2>&1) ($PYTHON)"
+echo "→ Using $($PYTHON --version 2>&1) ($PYTHON)"
 
 mkdir -p "$INSTALL_DIR"
 
-echo "→ Bikin virtualenv terisolasi di $VENV_DIR"
+echo "→ Creating an isolated virtualenv at $VENV_DIR"
 if ! "$PYTHON" -m venv "$VENV_DIR"; then
     echo "" >&2
-    echo "✗ Gagal bikin virtualenv." >&2
+    echo "✗ Failed to create the virtualenv." >&2
     if command -v apt >/dev/null 2>&1; then
-        echo "  Coba: sudo apt install python3-venv" >&2
+        echo "  Try: sudo apt install python3-venv" >&2
     fi
     exit 1
 fi
 
-echo "→ Install lanshare dari $REPO_TARBALL"
+echo "→ Installing lanshare from $REPO_TARBALL"
 "$VENV_DIR/bin/pip" install --quiet --upgrade pip
 "$VENV_DIR/bin/pip" install --quiet --upgrade --force-reinstall "$REPO_TARBALL"
 
@@ -70,18 +70,18 @@ ln -sf "$VENV_DIR/bin/lanshare" "$BIN_DIR/lanshare"
 ln -sf "$VENV_DIR/bin/sharelan" "$BIN_DIR/sharelan"
 
 echo ""
-echo "✓ lanshare kepasang di $BIN_DIR/lanshare"
+echo "✓ lanshare installed at $BIN_DIR/lanshare"
 
 case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
     *)
         echo ""
-        echo "  $BIN_DIR belum ada di PATH lu. Tambahin baris ini ke shell profile"
-        echo "  (~/.bashrc, ~/.zshrc, dst), terus buka terminal baru:"
+        echo "  $BIN_DIR isn't on your PATH yet. Add this line to your shell profile"
+        echo "  (~/.bashrc, ~/.zshrc, etc.), then open a new terminal:"
         echo ""
         echo "    export PATH=\"$BIN_DIR:\$PATH\""
         ;;
 esac
 
 echo ""
-echo "  Coba: sharelan --help (update: sharelan update)"
+echo "  Try: sharelan --help (update: sharelan update)"

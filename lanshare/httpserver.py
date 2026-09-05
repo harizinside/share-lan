@@ -8,7 +8,7 @@ import urllib.parse
 import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import fmt
+from . import fmt, i18n
 from .auth import check_code, lock_left, new_session, valid_session
 from .fmt import C, human
 from .mounts import (
@@ -34,7 +34,7 @@ def parse_range(header, size):
         return None
     spec = header.strip()[6:].strip()
     if "," in spec:
-        return "full"  # multi-range: sah dibales isi penuh, browser nggak pernah minta ini
+        return "full"  # multi-range: valid to reply with the full body, browsers never request this
     lo_s, _, hi_s = spec.partition("-")
     try:
         if lo_s == "":
@@ -72,7 +72,7 @@ class Handler(BaseHTTPRequestHandler):
     sys_version = ""
     timeout = 300
 
-    # -- dasar ------------------------------------------------------------
+    # -- basics -------------------------------------------------------------
     def log_message(self, *a):
         pass
 
@@ -132,29 +132,37 @@ class Handler(BaseHTTPRequestHandler):
     def send_json(self, obj, status=200):
         self.send(status, json.dumps(obj).encode(), "application/json; charset=utf-8")
 
-    def fail(self, status, msg):
+    def fail(self, status, key, **kwargs):
+        msg = i18n.t(key, getattr(self, "lang", i18n.DEFAULT_LANG), **kwargs)
         if self.path.startswith("/api/"):
             self.send_json({"error": msg}, status)
         else:
             self.send(
                 status,
-                ERROR_PAGE.replace("__CODE__", str(status)).replace("__MSG__", html.escape(msg)),
+                ERROR_PAGE.replace("__CODE__", str(status))
+                .replace("__MSG__", html.escape(msg))
+                .replace(
+                    "__BACK__",
+                    html.escape(
+                        i18n.t("error.back_link", getattr(self, "lang", i18n.DEFAULT_LANG))
+                    ),
+                ),
             )
 
     def redirect(self, to):
         self.head(302, "text/html; charset=utf-8", 0, {"Location": to})
 
-    # -- kirim byte -------------------------------------------------------
+    # -- sending bytes --------------------------------------------------------
     def pump(self, f, offset, length):
-        """Kirim potongan file. socket.sendfile() = zero-copy di kernel kalau bisa,
-        dan dia yang ngurus socket ber-timeout (yang secara internal non-blocking)."""
+        """Send a slice of a file. socket.sendfile() is zero-copy in the kernel when
+        available, and it handles the socket's timeout itself (internally non-blocking)."""
         if length <= 0:
             return 0
         self.wfile.flush()
         try:
             return self.connection.sendfile(f, offset, length)
         except (AttributeError, ValueError, NotImplementedError):
-            pass  # platform nggak dukung -> salin manual
+            pass  # platform doesn't support it -> copy manually
         sent = 0
         f.seek(offset)
         while sent < length:
@@ -168,13 +176,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def serve_file(self, path, name, force_dl=False):
         if not os.path.isfile(path):
-            return self.fail(404, "File nggak ketemu.")
+            return self.fail(404, "error.file_not_found")
         try:
             f = open(path, "rb")
         except OSError:
-            return self.fail(403, "File nggak bisa dibaca.")
+            return self.fail(403, "error.file_not_readable")
         with f:
-            size = os.fstat(f.fileno()).st_size  # ukuran dikunci dari handle, bukan dari listing
+            size = os.fstat(f.fileno()).st_size  # size is locked from the handle, not the listing
             rng = parse_range(self.headers.get("Range"), size)
             if rng == "unsat":
                 return self.send(416, b"", "text/plain", {"Content-Range": f"bytes */{size}"})
@@ -197,10 +205,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.command == "HEAD":
                 return
             sent = self.pump(f, start, length)
-            tail = f" (lanjut dari {human(start)})" if start else ""
+            tail = f" (resumed from {human(start)})" if start else ""
             if sent < length:
                 fmt.log(
-                    f"{C.dim('[' + self.ip + ']')} {name} {C.warn('batal')} di {human(start + sent)}"
+                    f"{C.dim('[' + self.ip + ']')} {name} {C.warn('aborted')} at {human(start + sent)}"
                 )
             else:
                 fmt.log(
@@ -210,7 +218,7 @@ class Handler(BaseHTTPRequestHandler):
     # -- ZIP --------------------------------------------------------------
     def serve_zip(self, paths):
         if len(paths) > 1:
-            # pilihan: beberapa item, tiap-tiap dibungkus nama foldernya sendiri
+            # selection: multiple items, each wrapped in its own folder name
             entries = []
             for pp in paths:
                 if not pp:
@@ -230,15 +238,15 @@ class Handler(BaseHTTPRequestHandler):
                         continue
                     files.append((path, arc))
             if not files:
-                return self.fail(404, "Nggak ada yang bisa di-download.")
-            name = "pilihan.zip"
+                return self.fail(404, "error.nothing_to_download")
+            name = i18n.t("zip.selection_name", getattr(self, "lang", i18n.DEFAULT_LANG))
             key = "\x00".join(sorted(x for x in paths if x))
         else:
             p = paths[0] if paths else ""
             try:
                 target = resolve(p)
             except (Missing, Denied):
-                return self.fail(404, "Nggak ketemu.")
+                return self.fail(404, "error.not_found")
             files, total = [], 0
             for path, arc in zip_entries(p, target):
                 try:
@@ -247,7 +255,7 @@ class Handler(BaseHTTPRequestHandler):
                     continue
                 files.append((path, arc))
             if not files:
-                return self.fail(404, "Folder ini kosong.")
+                return self.fail(404, "error.folder_empty")
             name = zip_name(p, target)
             key = p
         quoted = urllib.parse.quote(name)
@@ -270,8 +278,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             def put_file(path, off, n, size, mtime):
-                # Dicek dua kali: sebelum dan sesudah dikirim. Yang kedua nangkep file
-                # yang berubah pas lagi di tengah transfer.
+                # Checked twice: before and after sending. The second check catches a
+                # file that changed while the transfer was in progress.
                 st = os.stat(path)
                 if st.st_size != size or int(st.st_mtime) != mtime:
                     raise Stale(os.path.basename(path))
@@ -283,11 +291,11 @@ class Handler(BaseHTTPRequestHandler):
 
             emit_plan(segments, start, end, self.wfile.write, put_file)
             fmt.log(
-                f"{C.dim('[' + self.ip + ']')} {name} {C.ok(str(status))} {human(end - start)} (bisa resume)"
+                f"{C.dim('[' + self.ip + ']')} {name} {C.ok(str(status))} {human(end - start)} (resumable)"
             )
             return
 
-        # Kegedean buat pra-hitung CRC: streaming, konsekuensinya nggak bisa resume.
+        # Too large to pre-compute CRCs: stream instead, which means no resume.
         self.head(200, "application/zip", None, {"Content-Disposition": disp}, close=True)
         if self.command == "HEAD":
             return
@@ -306,48 +314,49 @@ class Handler(BaseHTTPRequestHandler):
             return hit[1], hit[2]
         t0 = time.monotonic()
         if total > (1 << 30):
-            fmt.log(f"Nyiapin ZIP ({human(total)}) - ngitung CRC biar bisa di-resume...")
+            fmt.log(f"Preparing ZIP ({human(total)}) - computing CRCs to make it resumable...")
         segments, zsize = build_zip_plan(files)
         if total > (1 << 30):
-            fmt.log(f"ZIP siap dalam {time.monotonic() - t0:.1f}s")
+            fmt.log(f"ZIP ready in {time.monotonic() - t0:.1f}s")
         with ST.lock:
             ST.zip_plans[p] = (sig, segments, zsize)
         return segments, zsize
 
     # -- upload -----------------------------------------------------------
     def do_PUT(self):
+        self.lang = i18n.get_lang(self.headers.get("Cookie"))
         parsed = urllib.parse.urlparse(self.path)
         qs = urllib.parse.parse_qs(parsed.query)
         if not self.authed(qs):
-            return self.fail(401, "Perlu kode akses.")
+            return self.fail(401, "error.code_required")
         if parsed.path != "/up":
-            return self.fail(404, "Nggak ada.")
+            return self.fail(404, "error.not_found")
         if ST.cfg.read_only:
-            return self.fail(403, "Upload dimatiin.")
+            return self.fail(403, "error.upload_disabled")
         p = self.qget(qs, "p")
         try:
             target = resolve(p)
         except Missing:
-            return self.fail(404, "Folder nggak ketemu.")
+            return self.fail(404, "error.folder_not_found")
         except Denied:
-            return self.fail(403, "Di luar folder yang dibagikan.")
+            return self.fail(403, "error.outside_shared_folder")
         if target is None or not os.path.isdir(target):
-            return self.fail(404, "Bukan folder.")
+            return self.fail(404, "error.not_a_folder")
         if not os.access(target, os.W_OK):
-            return self.fail(403, "Folder ini nggak bisa ditulisi.")
+            return self.fail(403, "error.folder_not_writable")
         folder = target
         try:
             length = int(self.headers.get("Content-Length") or "")
         except ValueError:
-            return self.fail(411, "Content-Length wajib ada.")
+            return self.fail(411, "error.content_length_required")
         if ST.cfg.max_upload and length > ST.cfg.max_upload:
-            return self.fail(413, f"Maksimal {human(ST.cfg.max_upload)} per file.")
+            return self.fail(413, "error.max_upload_size", size=human(ST.cfg.max_upload))
         try:
             free = shutil.disk_usage(folder).free
         except OSError:
             free = None
         if free is not None and length + (1 << 30) > free:
-            return self.fail(507, "Sisa disk nggak cukup.")
+            return self.fail(507, "error.insufficient_disk")
 
         name = safe_upload_name(self.qget(qs, "name"))
         dest = unique_path(folder, name)
@@ -362,14 +371,14 @@ class Handler(BaseHTTPRequestHandler):
                     out.write(block)
                     got += len(block)
             if got != length:
-                raise OSError("koneksi putus")
+                raise OSError("connection dropped")
             os.replace(tmp, dest)
         except Exception as e:
             try:
                 os.remove(tmp)
             except OSError:
                 pass
-            fmt.log(f"{C.dim('[' + self.ip + ']')} upload {name} {C.bad('gagal')}: {e}")
+            fmt.log(f"{C.dim('[' + self.ip + ']')} upload {name} {C.bad('failed')}: {e}")
             self.close_connection = True
             return
         fmt.log(
@@ -379,9 +388,10 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- login ------------------------------------------------------------
     def do_POST(self):
+        self.lang = i18n.get_lang(self.headers.get("Cookie"))
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path != "/login":
-            return self.fail(404, "Nggak ada.")
+            return self.fail(404, "error.not_found")
         try:
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:
@@ -394,21 +404,25 @@ class Handler(BaseHTTPRequestHandler):
             nxt = "/"
         wait = lock_left(self.ip)
         if wait:
-            return self.send(
-                429, login_page(f"Kebanyakan salah. Coba lagi {wait} detik lagi.", nxt)
-            )
+            msg = i18n.t("login.too_many_attempts", self.lang, sec=wait)
+            return self.send(429, login_page(msg, nxt, self.lang))
         if check_code(self.ip, code):
             self.pending_cookie = new_session()
             return self.redirect(nxt)
         left = lock_left(self.ip)
-        msg = f"Kode salah. Dikunci {left} detik." if left else "Kode salah, coba lagi."
-        return self.send(401, login_page(msg, nxt))
+        msg = (
+            i18n.t("login.wrong_code_locked", self.lang, sec=left)
+            if left
+            else i18n.t("login.wrong_code_retry", self.lang)
+        )
+        return self.send(401, login_page(msg, nxt, self.lang))
 
     # -- GET / HEAD -------------------------------------------------------
     def do_HEAD(self):
         self.do_GET()
 
     def do_GET(self):
+        self.lang = i18n.get_lang(self.headers.get("Cookie"))
         parsed = urllib.parse.urlparse(self.path)
         route = parsed.path
         qs = urllib.parse.parse_qs(parsed.query)
@@ -421,22 +435,22 @@ class Handler(BaseHTTPRequestHandler):
             nxt = self.qget(qs, "next", "/")
             if not nxt.startswith("/"):
                 nxt = "/"
-            return self.send(200, login_page(nxt=nxt))
+            return self.send(200, login_page(nxt=nxt, lang=self.lang))
 
         if not self.authed(qs):
             if route.startswith("/api/"):
-                return self.fail(401, "Perlu kode akses.")
+                return self.fail(401, "error.code_required")
             nxt = urllib.parse.quote(self.path)
             return self.redirect(f"/login?next={nxt}")
 
         if route == "/":
-            # Kode di URL (dari QR) langsung ditukar cookie, terus dibuang dari URL
-            # biar nggak nyangkut di history HP.
+            # A code in the URL (from a QR scan) is swapped for a cookie right away and
+            # dropped from the URL so it doesn't linger in a phone's browser history.
             if "code" in qs:
                 keep = {k: v for k, v in qs.items() if k != "code"}
                 tail = urllib.parse.urlencode(keep, doseq=True)
                 return self.redirect("/?" + tail if tail else "/")
-            return self.send(200, page_html())
+            return self.send(200, page_html(self.lang))
 
         if route == "/api/rev":
             return self.send_json({"rev": ST.revision})
@@ -444,7 +458,7 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/qr":
             u = self.qget(qs, "u")
             if not u:
-                return self.fail(400, "Butuh parameter u.")
+                return self.fail(400, "error.missing_param_u")
             return self.send(
                 200, qr_svg(u), "image/svg+xml; charset=utf-8", {"Cache-Control": "no-store"}
             )
@@ -453,16 +467,16 @@ class Handler(BaseHTTPRequestHandler):
         try:
             target = resolve(p)
         except Missing:
-            return self.fail(404, "Nggak ketemu.")
+            return self.fail(404, "error.not_found")
         except Denied:
-            return self.fail(403, "Di luar folder yang dibagikan.")
+            return self.fail(403, "error.outside_shared_folder")
 
         try:
             if route == "/api/list":
                 return self.api_list(p, target, qs)
             if route == "/api/zipinfo":
                 if target is not None and not os.path.isdir(target):
-                    return self.fail(404, "Bukan folder.")
+                    return self.fail(404, "error.not_a_folder")
                 count, size, cut = total_stats(target)
                 return self.send_json(
                     {
@@ -474,11 +488,11 @@ class Handler(BaseHTTPRequestHandler):
                 )
             if route == "/api/hash":
                 if target is None or not os.path.isfile(target):
-                    return self.fail(404, "Bukan file.")
+                    return self.fail(404, "error.not_a_file")
                 return self.send_json({"sha256": sha256_of(target)})
             if route == "/dl":
                 if target is None:
-                    return self.fail(404, "Bukan file.")
+                    return self.fail(404, "error.not_a_file")
                 return self.serve_file(
                     target, os.path.basename(target), force_dl=self.qget(qs, "dl") == "1"
                 )
@@ -490,53 +504,53 @@ class Handler(BaseHTTPRequestHandler):
                 return self.serve_sums(p, target)
             if route == "/thumb":
                 if target is None:
-                    return self.fail(404, "Bukan file.")
+                    return self.fail(404, "error.not_a_file")
                 thumb = make_thumb(target)
                 if not thumb:
-                    return self.fail(404, "Nggak ada thumbnail.")
+                    return self.fail(404, "error.no_thumbnail")
                 data, ctype = thumb
                 return self.send(200, data, ctype, {"Cache-Control": "private, max-age=86400"})
             if route == "/preview":
                 if target is None or not os.path.isfile(target):
-                    return self.fail(404, "Bukan file.")
+                    return self.fail(404, "error.not_a_file")
                 name = os.path.basename(target)
                 ext = os.path.splitext(name)[1].lower()
-                # GroupDocs ngerjain format Office/CAD/ebook; kalau nggak kepasang,
-                # format itu yang dideny - PDF/gambar/media/teks tetap fallback native.
+                # GroupDocs handles Office/CAD/ebook formats; if it isn't installed, those
+                # formats are denied - PDF/image/media/text still fall back to native preview.
                 if not HAVE_GROUPDOCS and ext in DOC_EXT:
-                    return self.fail(404, "Preview dokumen butuh groupdocs-viewer-net.")
+                    return self.fail(404, "error.preview_requires_groupdocs")
                 if ext in (".txt", ".md", ".csv") or previewable(name):
                     if HAVE_GROUPDOCS and ext in DOC_EXT:
                         try:
                             data, _ = render_html(target)
                         except RenderError as e:
-                            return self.fail(422, f"Dokumen nggak bisa di-render: {e}")
+                            return self.fail(422, "error.render_failed", detail=str(e))
                         return self.send(
                             200,
                             data,
                             "text/html; charset=utf-8",
                             {"Cache-Control": "private, max-age=300"},
                         )
-                    return self.serve_file(target, name)  # inline (teks/media/pdf)
+                    return self.serve_file(target, name)  # inline (text/media/pdf)
                 if ext in INLINE_EXT:
                     return self.serve_file(target, name)
-                return self.fail(404, "Format ini nggak ada preview-nya.")
+                return self.fail(404, "error.no_preview_for_format")
         except (BrokenPipeError, ConnectionResetError):
-            fmt.log(f"{C.dim('[' + self.ip + ']')} {C.warn('dibatalin klien')}")
+            fmt.log(f"{C.dim('[' + self.ip + ']')} {C.warn('client cancelled')}")
             self.close_connection = True
             return
         except Stale as e:
-            fmt.log(f"{C.dim('[' + self.ip + ']')} {C.bad('putus')}: {e} berubah pas lagi dikirim")
+            fmt.log(f"{C.dim('[' + self.ip + ']')} {C.bad('dropped')}: {e} changed mid-send")
             self.close_connection = True
             return
-        return self.fail(404, "Nggak ada.")
+        return self.fail(404, "error.not_found")
 
-    # -- endpoint kecil ---------------------------------------------------
+    # -- small endpoints ----------------------------------------------------
     def api_list(self, p, target, qs):
         try:
             entries = list_entries(p, target)
         except Missing:
-            return self.fail(404, "Folder nggak ketemu.")
+            return self.fail(404, "error.folder_not_found")
         try:
             cursor = max(0, int(self.qget(qs, "cursor", "0")))
         except ValueError:

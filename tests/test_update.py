@@ -73,7 +73,7 @@ def test_release_lookup_failure_stops_before_install(monkeypatch):
     monkeypatch.setattr(U, "distribution", lambda _: SimpleNamespace(read_text=lambda _: "{}"))
 
     def boom():
-        raise U.urllib.error.URLError("nggak nyampe")
+        raise U.urllib.error.URLError("unreachable")
 
     monkeypatch.setattr(U, "latest_release_tag", boom)
     monkeypatch.setattr(U.subprocess, "run", lambda *a, **kw: pytest.fail("must not install"))

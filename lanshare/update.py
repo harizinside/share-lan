@@ -17,11 +17,11 @@ def installed_version():
     try:
         return version("share-lan")
     except PackageNotFoundError:
-        return "0.0.2"
+        return "0.0.3"
 
 
 def latest_release_tag():
-    """Tag rilis stabil terbaru di GitHub - bukan HEAD `main` yang bisa aja belum dites."""
+    """The newest stable release tag on GitHub - not `main` HEAD, which may be untested."""
     req = urllib.request.Request(
         LATEST_RELEASE_API, headers={"Accept": "application/vnd.github+json"}
     )
@@ -29,7 +29,7 @@ def latest_release_tag():
         data = json.loads(resp.read())
     tag = data.get("tag_name")
     if not tag:
-        raise ValueError("respons rilis GitHub nggak punya tag_name")
+        raise ValueError("GitHub release response has no tag_name")
     return tag
 
 
@@ -37,16 +37,16 @@ def update():
     try:
         direct_url = json.loads(distribution("share-lan").read_text("direct_url.json") or "{}")
     except PackageNotFoundError:
-        print("Belum terinstall. Jalankan installer dari README dulu.", file=sys.stderr)
+        print("Not installed yet. Run the installer from the README first.", file=sys.stderr)
         return 1
     if direct_url.get("dir_info", {}).get("editable"):
-        print("Instalasi editable: jalankan git pull di repo, lalu uv sync.", file=sys.stderr)
+        print("Editable install: run git pull in the repo, then uv sync.", file=sys.stderr)
         return 1
 
     try:
         tag = latest_release_tag()
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
-        print(f"Gagal ambil rilis terbaru dari GitHub: {exc}", file=sys.stderr)
+        print(f"Failed to fetch the latest release from GitHub: {exc}", file=sys.stderr)
         return 1
     source_url = f"https://github.com/{REPO}/archive/refs/tags/{tag}.tar.gz"
 
@@ -72,17 +72,17 @@ def update():
             source_url,
         ]
     else:
-        print("pip/uv nggak ketemu. Jalankan ulang installer dari README.", file=sys.stderr)
+        print("pip/uv not found. Re-run the installer from the README.", file=sys.stderr)
         return 1
 
-    print(f"Update sharelan {installed_version()} -> {tag} dari GitHub…", flush=True)
+    print(f"Updating sharelan {installed_version()} -> {tag} from GitHub…", flush=True)
     try:
         result = subprocess.run(command, check=False)
     except OSError as exc:
-        print(f"Gagal menjalankan updater: {exc}", file=sys.stderr)
+        print(f"Failed to run the updater: {exc}", file=sys.stderr)
         return 1
     if result.returncode:
-        print("Update gagal. Periksa output di atas, lalu coba lagi.", file=sys.stderr)
+        print("Update failed. Check the output above, then try again.", file=sys.stderr)
         return result.returncode
-    print("Update selesai. Cek versi dengan sharelan --version.")
+    print("Update complete. Check the version with sharelan --version.")
     return 0

@@ -1,4 +1,4 @@
-"""Tes buat console.py - REPL ls/rm/qr/q yang jalan di stdin."""
+"""Tests for console.py - the ls/rm/qr/q REPL that runs on stdin."""
 
 import pytest
 
@@ -7,7 +7,7 @@ from lanshare.console import CONSOLE_HELP, console_available, console_loop, prin
 
 
 class FakeStdin:
-    """readline() ngeluarin baris satu-satu, baris kosong di ujung = stdin ketutup (EOF)."""
+    """readline() yields one line at a time; an empty string at the end = stdin closed (EOF)."""
 
     def __init__(self, lines):
         self.lines = list(lines) + [""]
@@ -30,8 +30,8 @@ class FakeServer:
 
 @pytest.fixture
 def configured(tree):
-    """ST kekonfigurasi (mounts + cfg) tanpa nyalain socket server beneran."""
-    argv = [str(tree / "Dokumen"), str(tree / "Galeri"), "--code", "4815", "--no-qr"]
+    """ST configured (mounts + cfg) without starting a real server socket."""
+    argv = [str(tree / "Documents"), str(tree / "Gallery"), "--code", "4815", "--no-qr"]
     cfg = L.parse_args(argv)
     L.ST.fails.clear()
     L.ST.sessions.clear()
@@ -89,7 +89,7 @@ def test_quit_shuts_down_server(configured):
 
 
 def test_blank_lines_are_skipped(configured):
-    # baris kosong beneran itu "\n" (Enter doang) - string kosong "" berarti EOF di readline().
+    # A real blank line is "\n" (just Enter) - an empty string "" means EOF from readline().
     httpd = run_loop(["\n", "   \n", "q"])
     assert httpd.shutdown_called is True
 
@@ -108,37 +108,37 @@ def test_help_prints_command_list(configured, capsys):
 def test_ls_lists_current_mounts(configured, capsys):
     run_loop(["ls", "q"])
     out = capsys.readouterr().out
-    assert "Dokumen" in out and "Galeri" in out
+    assert "Documents" in out and "Gallery" in out
 
 
 def test_add_path_via_drag_and_drop(configured, capsys, tree):
-    new_dir = tree / "lain"
+    new_dir = tree / "other"
     run_loop([str(new_dir), "q"])
     out = capsys.readouterr().out
-    assert "lain" in out
-    assert "lain" in L.ST.mounts
+    assert "other" in out
+    assert "other" in L.ST.mounts
 
 
 def test_add_unknown_path_reports_error(configured, capsys):
-    run_loop(["/path/yang/pasti/nggak/ada", "q"])
+    run_loop(["/path/that/definitely/does/not/exist", "q"])
     out = capsys.readouterr().out
     assert "✗" in out
-    assert "/path/yang/pasti/nggak/ada" not in L.ST.mounts.values()
+    assert "/path/that/definitely/does/not/exist" not in L.ST.mounts.values()
 
 
 def test_rm_by_name_and_by_index(configured, capsys):
-    assert "Dokumen" in L.ST.mounts
-    run_loop(["rm Dokumen", "q"])
-    assert "Dokumen" not in L.ST.mounts
+    assert "Documents" in L.ST.mounts
+    run_loop(["rm Documents", "q"])
+    assert "Documents" not in L.ST.mounts
     remaining = next(iter(L.ST.mounts))
     run_loop(["rm 1", "q"])
     assert remaining not in L.ST.mounts
 
 
 def test_rm_unknown_name_reports_error(configured, capsys):
-    run_loop(["rm nggak-ada-beneran", "q"])
+    run_loop(["rm does-not-exist", "q"])
     out = capsys.readouterr().out
-    assert "Nggak ketemu" in out
+    assert "Not found" in out
 
 
 def test_qr_reprints_banner(configured, capsys):
@@ -148,8 +148,8 @@ def test_qr_reprints_banner(configured, capsys):
 
 
 def test_unbalanced_quotes_treated_as_literal_path(configured, capsys):
-    # shlex.split() gagal di kutip nggak seimbang - fallback ke baris apa adanya sbg 1 path.
-    run_loop(['"nggak ada path kayak gini', "q"])
+    # shlex.split() fails on unbalanced quotes - falls back to treating the line as one path.
+    run_loop(['"no path like this exists', "q"])
     out = capsys.readouterr().out
     assert "✗" in out
 
@@ -170,7 +170,7 @@ def test_loop_survives_unexpected_exception(configured, capsys, monkeypatch):
 def test_print_shared_empty(monkeypatch, capsys):
     monkeypatch.setattr(L.ST, "mounts", {})
     print_shared()
-    assert "Belum ada" in capsys.readouterr().out
+    assert "Nothing shared" in capsys.readouterr().out
 
 
 def test_console_help_mentions_all_commands():

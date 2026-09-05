@@ -2,6 +2,7 @@ import html
 import json
 import os
 
+from . import i18n
 from .mounts import Denied, Missing, can_upload_here, resolve
 from .preview import HAVE_GROUPDOCS
 from .state import ST
@@ -72,6 +73,7 @@ a{color:inherit;text-decoration:none}
 .iconbtn:active{transform:translateY(0) scale(.96)}
 .iconbtn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;
   stroke-linecap:round;stroke-linejoin:round}
+.iconbtn.txt{font-size:11.5px;font-weight:700;letter-spacing:.02em}
 
 main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 
@@ -88,7 +90,7 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 .search input{border:0;background:none;outline:none;width:100%}
 .tools{display:flex;gap:8px}
 
-/* aksi folder */
+/* folder actions */
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;
   border-radius:11px;border:1px solid var(--line);background:var(--card);
@@ -103,7 +105,7 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
   border-radius:11px;color:var(--warn);font-size:12.5px;font-weight:550;
   background:color-mix(in srgb,var(--warn) 12%,transparent)}
 
-/* daftar */
+/* list */
 .list{display:flex;flex-direction:column;gap:6px}
 .lhead{display:grid;grid-template-columns:28px 42px minmax(0,1fr) 110px 90px 96px auto;
   align-items:center;gap:12px;padding:0 12px;height:30px;color:var(--muted);
@@ -130,7 +132,7 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
   opacity:0;transition:opacity .25s}
 .tb.on{opacity:1}
 .tb.pdf{object-position:top;background:#fff}
-/* video preview pas hover (kayak YouTube) */
+/* video preview on hover (like YouTube) */
 .vp{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
   opacity:0;transition:opacity .25s;pointer-events:none;background:#000}
 .ph:hover .vp,.thumb:hover .vp{opacity:1}
@@ -169,7 +171,7 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 .card:hover .qr{opacity:1}
 @media (hover:none){.card .qr{opacity:1}}
 
-/* bilah pilihan */
+/* selection bar */
 .selbar{position:sticky;top:66px;z-index:20;display:flex;align-items:center;gap:10px;
   flex-wrap:wrap;margin-bottom:14px;padding:9px 12px;border-radius:var(--r);
   border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--card));
@@ -178,7 +180,7 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 .selbar .cnt small{color:var(--muted);font-weight:500;display:block}
 .selbar .btn{padding:0 12px;height:34px;font-size:13px}
 
-/* kosong & skeleton */
+/* empty state & skeleton */
 .empty{text-align:center;padding:64px 20px;color:var(--muted)}
 .empty svg{width:44px;height:44px;stroke:currentColor;fill:none;stroke-width:1.2;
   opacity:.5;margin-bottom:10px}
@@ -208,7 +210,7 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 .drop div{padding:52px 64px;border-radius:22px;border:2px dashed var(--accent);
   font-size:17px;font-weight:650;background:var(--card);animation:pulse 1.6s infinite}
 
-/* modal QR */
+/* QR modal */
 .modal{position:fixed;inset:0;z-index:70;display:none;place-items:center;padding:20px;
   background:rgba(4,6,14,.62);backdrop-filter:blur(10px)}
 .modal.on{display:grid;animation:fade .18s}
@@ -227,7 +229,7 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 .sheet .row2 button.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));
   color:#fff;border-color:transparent}
 
-/* modal preview dokumen */
+/* document preview modal */
 .modal.pv{padding:0}
 .pvbox{width:min(1000px,96vw);height:min(88vh,900px);display:flex;flex-direction:column;
   background:var(--bg);color:var(--ink);border-radius:18px;overflow:hidden;
@@ -282,6 +284,8 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 
 JS = r"""
 const CFG = __CFG__;
+const STRINGS = __STRINGS__;
+let LANG = CFG.lang || "en";
 const $ = s => document.querySelector(s);
 const enc = encodeURIComponent;
 const deep = new URLSearchParams(location.search).get("p");
@@ -290,7 +294,31 @@ let S = {path: deep !== null ? deep : CFG.initial, entries: [], total: 0,
 let sortKey = localStorage.getItem("ls-sort") || "name";
 let sortDir = localStorage.getItem("ls-dir") || "asc";
 
-/* ---------- ikon ---------- */
+/* ---------- translation ---------- */
+function t(key, vars){
+  let s = (STRINGS[LANG] && STRINGS[LANG][key]) || (STRINGS.en && STRINGS.en[key]) || key;
+  if (vars) for (const k in vars) s = s.split("{" + k + "}").join(vars[k]);
+  return s;
+}
+function applyStatic(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-title]").forEach(el => { el.title = t(el.dataset.i18nTitle); });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  document.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", t(el.dataset.i18nAria)); });
+  const lb = $("#langBtn");
+  if (lb) { lb.textContent = LANG.toUpperCase(); lb.hidden = !CFG.langs || CFG.langs.length < 2; }
+}
+function toggleLang(){
+  const langs = CFG.langs && CFG.langs.length ? CFG.langs : ["en"];
+  const i = langs.indexOf(LANG);
+  LANG = langs[(i + 1) % langs.length];
+  localStorage.setItem("ls-lang", LANG);
+  document.cookie = "sl_lang=" + LANG + "; path=/; max-age=31536000; SameSite=Lax";
+  applyStatic(); render(); syncUpload();
+}
+
+/* ---------- icons ---------- */
 const P = {
   dir:  '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 5-5 4 4 3-2 4 4"/>',
@@ -308,10 +336,11 @@ const TINT = {dir:"var(--accent)", image:"#e8735a", video:"#c07bff", audio:"#3aa
               archive:"#d99a2b", doc:"#4a8ef0", xls:"#27a844", ppt:"#f47a3c", sql:"#3aa6d6",
               code:"#5bbf6a", file:"var(--muted)"};
 const ico = (k, cls) => `<svg class="${cls||'ic'}" viewBox="0 0 24 24" stroke="${TINT[k]||TINT.file}">${P[k]||P.file}</svg>`;
-const KIND = {dir:"Folder", image:"Gambar", video:"Video", audio:"Audio",
-              archive:"Arsip", doc:"Dokumen", xls:"Spreadsheet", ppt:"Slide",
-              sql:"Database", code:"Kode", file:"File"};
-const kindTag = e => `<span class="kind">${e.dir?"Folder":KIND[e.kind]||"File"}</span>`;
+const KIND_KEY = {dir:"kind.dir", image:"kind.image", video:"kind.video", audio:"kind.audio",
+              archive:"kind.archive", doc:"kind.doc", xls:"kind.xls", ppt:"kind.ppt",
+              sql:"kind.sql", code:"kind.code", file:"kind.file"};
+const kindLabel = k => t(KIND_KEY[k] || "kind.file");
+const kindTag = e => `<span class="kind">${e.dir?t("kind.dir"):kindLabel(e.kind)}</span>`;
 const UI = {
   eye:'<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
   qr:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2M14 21h1"/></svg>',
@@ -327,7 +356,7 @@ const UI = {
   box:'<svg viewBox="0 0 24 24"><path d="M20 7 12 3 4 7v10l8 4 8-4z"/><path d="M4 7l8 5 8-5M12 12v9"/></svg>',
 };
 
-/* ---------- util ---------- */
+/* ---------- utils ---------- */
 function human(n){ if(n===null||n===undefined) return "";
   const u=["B","KB","MB","GB","TB"]; let i=0; n=Number(n);
   while(n>=1024&&i<u.length-1){n/=1024;i++}
@@ -340,16 +369,16 @@ function when(ts){ const d=new Date(ts*1000), n=new Date();
 function toast(msg, bad){ const t=document.createElement("div");
   t.className="toast"+(bad?" bad":""); t.textContent=msg; $("#toasts").append(t);
   setTimeout(()=>{t.style.opacity=0; setTimeout(()=>t.remove(),300)}, 2400); }
-async function copy(text, msg){ try{ await navigator.clipboard.writeText(text); toast(msg||"Disalin"); }
+async function copy(text, msg){ try{ await navigator.clipboard.writeText(text); toast(msg||t("toast.copied")); }
   catch(e){ const a=document.createElement("textarea"); a.value=text; document.body.append(a);
-    a.select(); document.execCommand("copy"); a.remove(); toast(msg||"Disalin"); } }
+    a.select(); document.execCommand("copy"); a.remove(); toast(msg||t("toast.copied")); } }
 const dlUrl = p => `/dl?p=${enc(p)}&dl=1`;
 const abs = u => location.origin + u + (u.includes("?")?"&":"?") + "code=" + CFG.code;
 const DOC_RE = /\.(txt|md|csv|docx?|docm|dotx?|xlsx?|xlsm|xlsb|xltx?|pptx?|pptm|ppsx?|potx?|odt|ods|odp|rtf|epub|mobi|msg|eml|vsdx?|dwg|dxf)$/i;
 const canPreview = e => !e.dir && (e.kind==="image"||e.kind==="video"||e.kind==="audio"||isPdf(e)||
   (CFG.preview ? DOC_RE.test(e.name) : /\.(txt|md|csv)$/i.test(e.name)));
 
-/* ---------- tema & tampilan ---------- */
+/* ---------- theme & view ---------- */
 function applyTheme(){ const t=localStorage.getItem("ls-theme");
   if(t) document.documentElement.dataset.theme=t; else delete document.documentElement.dataset.theme;
   const dark = t ? t==="dark" : matchMedia("(prefers-color-scheme:dark)").matches;
@@ -367,8 +396,8 @@ async function load(path){
   S.path=path; S.loading=true; S.sel.clear(); render();
   const r=await fetch(`/api/list?p=${enc(path)}`, {headers:{"Accept":"application/json"}});
   if(!r.ok){ S.loading=false;
-    if(path){ toast("Folder itu udah nggak dibagikan", true); return load(""); }
-    toast("Gagal memuat", true); render(); return; }
+    if(path){ toast(t("load.folder_gone"), true); return load(""); }
+    toast(t("load.failed"), true); render(); return; }
   const d=await r.json();
   S.entries=d.entries; S.total=d.total; S.parent=d.parent; S.next=d.next_cursor;
   S.rev=d.rev; S.shared=d.shared_count; S.loading=false;
@@ -384,33 +413,33 @@ async function zipInfo(path){
     const r=await fetch(`/api/zipinfo?p=${enc(path)}`); if(!r.ok) return;
     const d=await r.json(); if(path!==S.path) return;
     if(!d.resumable) $("#zipnote").innerHTML =
-      `<span class="note">⚠ ${human(d.size)}${d.truncated?"+":""} — ZIP nggak bisa dilanjut kalau putus, mending per file</span>`;
+      `<span class="note">${t("zip.cannot_resume_note", {size: human(d.size)+(d.truncated?"+":"")})}</span>`;
   }catch(e){}
 }
 async function loadMore(){
   if(S.next===null||S.next===undefined) return;
-  const btn=$("#more"); if(btn) btn.textContent="Memuat…";
+  const btn=$("#more"); if(btn) btn.textContent=t("loadmore.loading");
   const r=await fetch(`/api/list?p=${enc(S.path)}&cursor=${S.next}`);
-  if(!r.ok){ toast("Gagal memuat sisanya", true); return; }
+  if(!r.ok){ toast(t("loadmore.failed"), true); return; }
   const d=await r.json();
   S.entries=S.entries.concat(d.entries); S.next=d.next_cursor; render();
 }
 const filtered = () => { const q=S.filter.trim().toLowerCase();
   return q ? S.entries.filter(e=>e.name.toLowerCase().includes(q)) : S.entries; };
 
-/* ---------- urutan (ala Finder) ---------- */
+/* ---------- sorting (Finder-style) ---------- */
 const KEYS = ["name","mtime","size","kind"];
 function sorted(list){
-  const coll = new Intl.Collator("id", {numeric:true, sensitivity:"base"});
+  const coll = new Intl.Collator(LANG, {numeric:true, sensitivity:"base"});
   const dir = sortDir==="desc" ? -1 : 1;
   return list.slice().sort((a,b)=>{
-    if(a.dir!==b.dir) return a.dir ? -1 : 1;      /* folder selalu di atas */
+    if(a.dir!==b.dir) return a.dir ? -1 : 1;      /* folders always on top */
     let va, vb;
     if(sortKey==="size"){ va=a.size; vb=b.size;
       if(va===null||va===undefined) va=-1;
       if(vb===null||vb===undefined) vb=-1;
       return (va-vb)*dir || coll.compare(a.name,b.name); }
-    if(sortKey==="kind"){ va=KIND[a.kind]||"File"; vb=KIND[b.kind]||"File";
+    if(sortKey==="kind"){ va=kindLabel(a.kind); vb=kindLabel(b.kind);
       return coll.compare(va,vb)*dir || coll.compare(a.name,b.name); }
     if(sortKey==="mtime"){ return (a.mtime-b.mtime)*dir || coll.compare(a.name,b.name); }
     return coll.compare(a.name,b.name)*dir;
@@ -427,7 +456,7 @@ function setSort(key){
 function render(){
   const parts = S.path ? S.path.split("/") : [];
   let cr = "";
-  if(!CFG.singleRoot) cr += `<button data-go="">Dibagikan</button>`;
+  if(!CFG.singleRoot) cr += `<button data-go="">${t("crumbs.root")}</button>`;
   parts.forEach((seg,i)=>{
     const target = parts.slice(0,i+1).join("/");
     const last = i===parts.length-1;
@@ -435,16 +464,16 @@ function render(){
     cr += last ? `<span class="cur">${esc(seg)}</span>`
                : `<button data-go="${escA(target)}">${esc(seg)}</button>`;
   });
-  if(!parts.length) cr = `<span class="cur">Dibagikan</span>`;
+  if(!parts.length) cr = `<span class="cur">${t("crumbs.root")}</span>`;
   $("#crumbs").innerHTML = cr;
 
   const acts=[];
   if(S.parent!==null && S.parent!==undefined)
-    acts.push(`<button class="btn" data-go="${escA(S.parent)}">${UI.up}Naik</button>`);
+    acts.push(`<button class="btn" data-go="${escA(S.parent)}">${UI.up}${t("action.up")}</button>`);
   if(S.entries.length){
-    acts.push(`<button class="btn primary" data-zip="1">${UI.zip}Download semua (ZIP)</button>`);
-    acts.push(`<button class="btn" data-urls="1">${UI.link}Salin daftar URL</button>`);
-    acts.push(`<button class="btn" data-qrfolder="1">${UI.qr}QR folder</button>`);
+    acts.push(`<button class="btn primary" data-zip="1">${UI.zip}${t("action.download_all_zip")}</button>`);
+    acts.push(`<button class="btn" data-urls="1">${UI.link}${t("action.copy_url_list")}</button>`);
+    acts.push(`<button class="btn" data-qrfolder="1">${UI.qr}${t("action.folder_qr")}</button>`);
   }
   $("#folderActions").innerHTML = acts.join("") + `<span id="zipnote"></span>`;
 
@@ -452,10 +481,10 @@ function render(){
   if(S.sel.size){
     const selNames = S.entries.filter(e=>S.sel.has(e.path)).map(e=>e.name);
     selEl.innerHTML = `<div class="selbar">
-      <span class="cnt">${S.sel.size} dipilih
+      <span class="cnt">${t("selbar.selected", {n: S.sel.size})}
         <small>${selNames.slice(0,3).join(", ")}${selNames.length>3?"…":""}</small></span>
-      <button class="btn primary" data-selzip="1">${UI.zip}Download pilihan</button>
-      <button class="btn" data-selclear="1">Batal</button>
+      <button class="btn primary" data-selzip="1">${UI.zip}${t("selbar.download_selection")}</button>
+      <button class="btn" data-selclear="1">${t("selbar.cancel")}</button>
     </div>`;
   } else selEl.innerHTML="";
 
@@ -463,13 +492,13 @@ function render(){
   if(S.loading){ box.innerHTML=`<div class="sk"></div><div class="sk"></div><div class="sk"></div>`; return; }
   const list=filtered();
   if(!list.length){
-    const kosong = !S.path && !S.shared;
+    const empty = !S.path && !S.shared;
     box.innerHTML = `<div class="empty">${UI.box}<div>${
-      S.filter ? "Nggak ada yang cocok"
-      : kosong ? "Belum ada yang dibagikan"
-      : "Folder ini kosong"}</div>${
-      kosong ? `<div style="margin-top:6px;font-size:12.5px;opacity:.8">
-        Yang bagiin lagi nyiapin filenya — halaman ini update sendiri.</div>` : ""}</div>`;
+      S.filter ? t("empty.no_matches")
+      : empty ? t("empty.nothing_shared")
+      : t("empty.folder_empty")}</div>${
+      empty ? `<div style="margin-top:6px;font-size:12.5px;opacity:.8">
+        ${t("empty.sender_preparing")}</div>` : ""}</div>`;
     return; }
 
   const mode=viewMode();
@@ -488,10 +517,10 @@ function render(){
         <div class="cap">${ico(e.kind,"ic")}<span title="${escA(e.name)}">${esc(e.name)}</span>${kindTag(e)}</div>
       </div>`;
     const chk = `<input type="checkbox" class="ck" data-check="${escA(e.path)}"
-        ${S.sel.has(e.path)?"checked":""} aria-label="Pilih ${escA(e.name)}">`;
+        ${S.sel.has(e.path)?"checked":""} aria-label="${escA(t("aria.select",{name:e.name}))}">`;
     const act = `<div class="act">
           ${canPreview(e)?`<button class="iconbtn" data-prev="${escA(e.path)}" title="Preview">${UI.eye}</button>`:""}
-          <a class="iconbtn" href="${e.dir?`/zip?p=${enc(e.path)}`:dlUrl(e.path)}" title="Download">${UI.dl}</a>
+          <a class="iconbtn" href="${e.dir?`/zip?p=${enc(e.path)}`:dlUrl(e.path)}" title="${t("preview.download")}">${UI.dl}</a>
           <button class="iconbtn" data-qr="${escA(e.path)}" data-isdir="${e.dir?1:0}" title="QR">${UI.qr}</button>
         </div>`;
     return `<div class="row" style="animation-delay:${d}ms">
@@ -507,27 +536,27 @@ function render(){
   }).join("");
   if(S.total>S.entries.length) box.insertAdjacentHTML("beforeend",
     `<div class="empty" style="padding:18px 0">
-       <button class="btn" id="more">Muat ${Math.min(2000,S.total-S.entries.length)} item lagi</button>
-       <div style="margin-top:8px;font-size:12.5px">Nampilin ${S.entries.length} dari ${S.total}</div>
+       <button class="btn" id="more">${t("pagination.load_more",{n: Math.min(2000,S.total-S.entries.length)})}</button>
+       <div style="margin-top:8px;font-size:12.5px">${t("pagination.showing",{a:S.entries.length,b:S.total})}</div>
      </div>`);
   const more=$("#more"); if(more) more.onclick=loadMore;
 }
 const esc = s => String(s).replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const escA = s => esc(s).replace(/"/g,"&quot;");
 
-/* Header kolom ala Finder — klik buat ganti kolom, klik lagi asc/desc */
+/* Finder-style column header — click to change column, click again to flip asc/desc */
 function listHead(){
-  const lbl = {name:"Nama", mtime:"Date Modified", size:"Size", kind:"Kind"};
+  const lbl = {name:t("col.name"), mtime:"Date Modified", size:"Size", kind:"Kind"};
   const arrow = sortDir==="desc" ? "▼" : "▲";
   return `<div class="lhead" role="row"><span></span><span></span>` + KEYS.map(k=>{
     const act = sortKey===k ? ` data-active="1"` : "";
     return `<button class="col ${k==="name"?"n":"m"}" data-sort="${k}"${act}>
       <span class="arrow">${arrow}</span><span>${lbl[k]}</span></button>`;
-  }).join("") + `<span class="ah">Aksi</span></div>`;
+  }).join("") + `<span class="ah">${t("col.actions")}</span></div>`;
 }
 
-/* Lazy-load bawaan browser: kalau thumbnail gagal, <img> dibuang dan ikonnya
-   yang keliatan lagi - jadi nggak ada state kosong. */
+/* Native lazy-loading: if a thumbnail fails, the <img> is removed and the icon
+   underneath shows through instead — no separate empty state needed. */
 const isPdf = e => !e.dir && /\.pdf$/i.test(e.name);
 const isVideo = e => !e.dir && e.kind === "video";
 const thumbTag = e => {
@@ -540,8 +569,8 @@ const thumbTag = e => {
   return img + v;
 };
 
-/* Video preview ala YouTube: play muted selagi di-hover, berhenti pas ditinggal.
-   Delegated biar element yang baru di-render langsung kena. */
+/* YouTube-style video preview: plays muted while hovered, stops on mouseout.
+   Delegated so newly-rendered elements are covered without re-binding. */
 let preview = null;
 function startPreview(host){
   const v = host.querySelector("video.vp");
@@ -573,7 +602,7 @@ function syncUpload(){
   document.body.style.paddingBottom = CFG.canUpload ? "96px" : "24px";
 }
 
-/* ---------- polling: daftar bagikan bisa berubah kapan aja dari terminal ---------- */
+/* ---------- polling: the shared list can change any time from the terminal ---------- */
 async function checkRev(){
   if(S.loading) return;
   try{
@@ -583,7 +612,7 @@ async function checkRev(){
   }catch(e){}
 }
 setInterval(()=>{ if(!document.hidden) checkRev(); }, 3000);
-// HP yang baru dibuka lagi jangan nunggu tick berikutnya
+// A phone that's just been reopened shouldn't wait for the next poll tick
 addEventListener("visibilitychange", ()=>{ if(!document.hidden) checkRev(); });
 
 /* ---------- QR ---------- */
@@ -593,11 +622,11 @@ function showQR(url, title, sub){
   $("#sheetUrl").textContent=url;
   $("#qrbox").innerHTML=`<img alt="QR" src="/qr?u=${enc(url)}">`;
   $("#modal").classList.add("on");
-  $("#sheetCopy").onclick=()=>copy(url,"Link disalin");
+  $("#sheetCopy").onclick=()=>copy(url,t("qr.link_copied"));
   $("#sheetOpen").onclick=()=>{ location.href=url; };
 }
 
-/* ---------- preview dokumen ---------- */
+/* ---------- document preview ---------- */
 function showPreview(p){
   $("#pvTitle").textContent = p.split("/").pop();
   $("#pvFrame").src = `/preview?p=${enc(p)}`;
@@ -607,7 +636,7 @@ function showPreview(p){
 function hidePreview(){
   if(!$("#pvModal").classList.contains("on")) return;
   $("#pvModal").classList.remove("on");
-  $("#pvFrame").src = "about:blank";  /* matiin media yang lagi jalan di iframe */
+  $("#pvFrame").src = "about:blank";  /* stop any media still playing in the iframe */
 }
 
 /* ---------- upload ---------- */
@@ -627,16 +656,16 @@ function upload(files){
       bar.style.width=(pct*100).toFixed(1)+"%";
       st.textContent=`${human(sp)}/s · ${left>90?Math.round(left/60)+"m":Math.round(left)+"s"}`;
     };
-    xhr.onload=()=>{ if(xhr.status<300){ bar.style.width="100%"; st.textContent="selesai ✓";
+    xhr.onload=()=>{ if(xhr.status<300){ bar.style.width="100%"; st.textContent=t("upload.done");
         setTimeout(()=>el.remove(),1800); load(S.path); }
-      else { st.textContent="gagal"; el.style.color="var(--warn)";
-        try{toast(JSON.parse(xhr.responseText).error,true)}catch(e){toast("Upload gagal",true)} } };
-    xhr.onerror=()=>{ st.textContent="gagal"; toast("Upload gagal",true); };
+      else { st.textContent=t("upload.failed_status"); el.style.color="var(--warn)";
+        try{toast(JSON.parse(xhr.responseText).error,true)}catch(e){toast(t("upload.failed_toast"),true)} } };
+    xhr.onerror=()=>{ st.textContent=t("upload.failed_status"); toast(t("upload.failed_toast"), true); };
     xhr.send(f);
   });
 }
 
-/* ---------- event ---------- */
+/* ---------- events ---------- */
 document.addEventListener("click", ev=>{
   const t=ev.target.closest("[data-go],[data-open],[data-qr],[data-prev],[data-hash],[data-zip],[data-urls],[data-qrfolder],[data-selzip],[data-selclear],[data-sort]");
   if(!t) return;
@@ -648,20 +677,20 @@ document.addEventListener("click", ev=>{
   if(t.dataset.qr!==undefined){ ev.preventDefault();
     const p=t.dataset.qr, dir=t.dataset.isdir==="1";
     const u=abs(dir?`/zip?p=${enc(p)}`:dlUrl(p));
-    showQR(u, p.split("/").pop(), dir?"Scan buat download folder (ZIP)":"Scan buat download file ini");
+    showQR(u, p.split("/").pop(), dir?window.t("qr.scan_download_folder"):window.t("qr.scan_download_file"));
     return; }
   if(t.dataset.prev!==undefined){ ev.preventDefault(); showPreview(t.dataset.prev); return; }
   if(t.dataset.qrfolder!==undefined){
-    showQR(abs(S.path?`/?p=${enc(S.path)}`:"/"), S.path.split("/").pop()||"Semua file",
-           "Scan buat buka daftar ini"); return; }
+    showQR(abs(S.path?`/?p=${enc(S.path)}`:"/"), S.path.split("/").pop()||window.t("qr.all_files"),
+           window.t("qr.scan_open_listing")); return; }
   if(t.dataset.zip!==undefined){ location.href=`/zip?p=${enc(S.path)}`; return; }
   if(t.dataset.urls!==undefined){
     fetch(`/urls?p=${enc(S.path)}`).then(r=>r.text()).then(txt=>{
       const n=txt.trim().split("\n").length;
-      copy(txt, `${n} URL disalin — pakai: aria2c -i list.txt`); }); return; }
-  if(t.dataset.hash!==undefined){ ev.preventDefault(); toast("Ngitung SHA-256...");
+      copy(txt, window.t("urls.copied", {n})); }); return; }
+  if(t.dataset.hash!==undefined){ ev.preventDefault(); toast(window.t("hash.calculating"));
     fetch(`/api/hash?p=${enc(t.dataset.hash)}`).then(r=>r.json())
-      .then(d=>d.sha256?copy(d.sha256,"SHA-256 disalin"):toast("Gagal",true)); return; }
+      .then(d=>d.sha256?copy(d.sha256,window.t("hash.copied")):toast(window.t("hash.failed"),true)); return; }
   if(t.dataset.selzip!==undefined){
     if(!S.sel.size) return;
     const q=[...S.sel].map(x=>"p="+enc(x)).join("&");
@@ -682,9 +711,10 @@ addEventListener("keydown", e=>{ if(e.key==="Escape"){ $("#modal").classList.rem
   if(e.key==="/" && document.activeElement!==$("#q")){ e.preventDefault(); $("#q").focus(); } });
 $("#q").oninput = e => { S.filter=e.target.value; render(); };
 $("#themeBtn").onclick = toggleTheme;
+$("#langBtn").onclick = toggleLang;
 $("#viewBtn").onclick = () => { localStorage.setItem("ls-view", viewMode()==="grid"?"list":"grid"); render(); };
-$("#codeChip").onclick = () => showQR(abs("/"), "Kode akses "+CFG.code, "Scan buat masuk tanpa ngetik");
-$("#qrTop").onclick = () => showQR(abs(S.path?`/?p=${enc(S.path)}`:"/"), "Halaman ini", "Scan buat buka di HP");
+$("#codeChip").onclick = () => showQR(abs("/"), t("qr.access_code_title",{code:CFG.code}), t("qr.scan_signin"));
+$("#qrTop").onclick = () => showQR(abs(S.path?`/?p=${enc(S.path)}`:"/"), t("qr.this_page"), t("qr.scan_open_phone"));
 
 $("#pick").onchange = e => { upload(e.target.files); e.target.value=""; };
 let depth=0;
@@ -697,13 +727,15 @@ addEventListener("drop", e=>{ if(!CFG.canUpload) return; e.preventDefault(); dep
   $("#drop").classList.remove("on");
   if(e.dataTransfer.files.length) upload(e.dataTransfer.files); });
 $("#qrTop").innerHTML = UI.qr;
+window.t = t;
 syncUpload();
 applyTheme();
+applyStatic();
 load(S.path);
 """
 
 SHELL = r"""<!doctype html>
-<html lang="id"><head>
+<html lang="__LANG__"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
@@ -723,9 +755,10 @@ SHELL = r"""<!doctype html>
     <span>share<b>·</b>lan</span>
   </div>
   <div class="spacer"></div>
-  <button class="chip" id="codeChip" title="Kode akses — klik buat QR">__CODE__ <small>kode</small></button>
-  <button class="iconbtn" id="qrTop" title="QR halaman ini"></button>
-  <button class="iconbtn" id="themeBtn" title="Ganti tema"></button>
+  <button class="chip" id="codeChip" data-i18n-title="header.code_chip_title">__CODE__ <small data-i18n="header.code_label">code</small></button>
+  <button class="iconbtn" id="qrTop" data-i18n-title="header.qr_top_title"></button>
+  <button class="iconbtn" id="themeBtn" data-i18n-title="header.theme_title"></button>
+  <button class="iconbtn txt" id="langBtn" data-i18n-title="header.lang_title">EN</button>
 </header>
 <main>
   <div class="bar">
@@ -733,9 +766,9 @@ SHELL = r"""<!doctype html>
     <div class="tools">
       <label class="search">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input id="q" type="search" placeholder="Cari di folder ini…" aria-label="Cari">
+        <input id="q" type="search" data-i18n-ph="search.placeholder" data-i18n-aria="search.aria" placeholder="Search this folder…" aria-label="Search">
       </label>
-      <button class="iconbtn" id="viewBtn" title="Ganti tampilan"></button>
+      <button class="iconbtn" id="viewBtn" data-i18n-title="header.view_title"></button>
     </div>
   </div>
   <div class="actions" id="folderActions"></div>
@@ -743,25 +776,25 @@ SHELL = r"""<!doctype html>
   <div id="content" class="list"></div>
 </main>
 __UPLOAD__
-<div class="drop" id="drop"><div>Lepas di sini buat dikirim</div></div>
+<div class="drop" id="drop"><div data-i18n="drop.hint">Drop here to send</div></div>
 <div class="modal" id="modal"><div class="sheet">
   <h3 id="sheetTitle"></h3><p id="sheetSub"></p>
   <div class="qrbox" id="qrbox"></div>
   <div class="url" id="sheetUrl"></div>
   <div class="row2">
-    <button id="sheetCopy">Salin link</button>
-    <button id="sheetOpen" class="primary">Buka</button>
+    <button id="sheetCopy" data-i18n="modal.copy_link">Copy link</button>
+    <button id="sheetOpen" class="primary" data-i18n="modal.open">Open</button>
   </div>
 </div></div>
 <div class="modal pv" id="pvModal">
   <div class="pvbox">
     <header class="pvhead">
-      <b id="pvTitle"></b><small>Preview — file asli nggak diubah</small>
+      <b id="pvTitle"></b><small data-i18n="preview.unchanged_note">Preview — original file is unchanged</small>
       <span class="pvspring"></span>
-      <a class="btn" id="pvDl" href="#">Download</a>
-      <button class="iconbtn" id="pvClose" title="Tutup">✕</button>
+      <a class="btn" id="pvDl" href="#" data-i18n="preview.download">Download</a>
+      <button class="iconbtn" id="pvClose" data-i18n-title="preview.close_title">✕</button>
     </header>
-    <div class="pvbody"><iframe id="pvFrame" title="Preview dokumen"></iframe></div>
+    <div class="pvbody"><iframe id="pvFrame" data-i18n-title="preview.iframe_title" title="Document preview"></iframe></div>
   </div>
 </div>
 <div class="toasts" id="toasts"></div>
@@ -772,10 +805,10 @@ UPLOAD_BAR = r"""<div class="ub" id="ub" hidden>
   <div class="jobs" id="jobs"></div>
   <div class="inner">
     <label class="btn primary" for="pick">
-      <svg viewBox="0 0 24 24"><path d="M12 20V8m0 0-4 4m4-4 4 4M4 4h16"/></svg>Kirim file
+      <svg viewBox="0 0 24 24"><path d="M12 20V8m0 0-4 4m4-4 4 4M4 4h16"/></svg><span data-i18n="upload.send_files">Send files</span>
     </label>
     <input id="pick" type="file" multiple hidden>
-    <div class="hint">Atau seret file ke mana aja di halaman ini</div>
+    <div class="hint" data-i18n="upload.drag_hint">Or drag files anywhere on this page</div>
   </div>
 </div>"""
 
@@ -787,51 +820,73 @@ color:#e9ebf5;font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-ser
 @media(prefers-color-scheme:light){body{background:#f4f6fb;color:#121420}}
 div{text-align:center;padding:30px}b{font-size:44px;display:block;opacity:.25;letter-spacing:-.03em}
 a{color:#8b7bff}</style>
-<div><b>__CODE__</b>__MSG__<p><a href="/">← balik ke daftar file</a></p></div>"""
+<div><b>__CODE__</b>__MSG__<p><a href="/">__BACK__</a></p></div>"""
 
-LOGIN_PAGE = r"""<!doctype html><html lang="id"><head><meta charset="utf-8">
+LOGIN_PAGE = r"""<!doctype html><html lang="__LANG__"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="color-scheme" content="light dark"><title>Masukin kode — share·lan</title>
+<meta name="color-scheme" content="light dark"><title>__TITLE__</title>
 <style>__CSS__
 .wrap{min-height:100vh;display:grid;place-items:center;padding:24px}
 .box{width:100%;max-width:340px;text-align:center;background:var(--card);
   border:1px solid var(--line);border-radius:22px;padding:30px 26px;box-shadow:var(--shadow);
-  backdrop-filter:blur(14px);animation:pop .3s}
+  backdrop-filter:blur(14px);animation:pop .3s;position:relative}
+.box .langtoggle{position:absolute;top:14px;right:14px}
 .box h1{margin:14px 0 4px;font-size:19px;letter-spacing:-.02em}
 .box p{margin:0 0 20px;color:var(--muted);font-size:13px}
 .box input{width:100%;height:58px;text-align:center;font-size:27px;font-weight:650;
   letter-spacing:.42em;text-indent:.42em;border-radius:14px;border:1px solid var(--line);
   background:var(--card2);outline:none;transition:border-color .15s}
 .box input:focus{border-color:var(--accent)}
-.box button{width:100%;height:46px;margin-top:12px;border-radius:14px;font-weight:650;
+.box button[type=submit]{width:100%;height:46px;margin-top:12px;border-radius:14px;font-weight:650;
   background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
 .err{color:var(--warn);font-size:13px;margin-top:14px;font-weight:550}
 .logo{width:44px;height:44px}</style></head><body>
 <div class="bgfx"></div>
 <div class="wrap"><form class="box" method="post" action="/login">
+  <button type="button" class="iconbtn txt langtoggle" id="langBtn" title="__LANG_TITLE__" __LANG_HIDDEN__>__LANG_UPPER__</button>
   <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.7"
        stroke-linecap="round" stroke-linejoin="round">
     <circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="18" cy="18" r="2.6"/>
     <path d="m8.4 10.7 7.2-3.4M8.4 13.3l7.2 3.4"/></svg>
-  <h1>Masukin kode akses</h1>
-  <p>Minta kodenya ke yang lagi bagiin file</p>
+  <h1>__HEADING__</h1>
+  <p>__SUBTEXT__</p>
   <input name="code" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-         maxlength="12" autofocus aria-label="Kode akses">
+         maxlength="12" autofocus aria-label="__INPUT_ARIA__">
   <input type="hidden" name="next" value="__NEXT__">
-  <button type="submit">Masuk</button>
+  <button type="submit">__SUBMIT__</button>
   __ERR__
-</form></div></body></html>"""
+</form></div>
+<script>
+document.getElementById("langBtn").onclick = function(){
+  var langs = __LANGS_JSON__;
+  var i = langs.indexOf("__LANG__");
+  var next = langs[(i + 1) % langs.length];
+  document.cookie = "sl_lang=" + next + "; path=/; max-age=31536000; SameSite=Lax";
+  location.reload();
+};
+</script>
+</body></html>"""
 
 
-def login_page(err="", nxt="/"):
+def login_page(err="", nxt="/", lang=i18n.DEFAULT_LANG):
     return (
         LOGIN_PAGE.replace("__CSS__", CSS)
+        .replace("__LANGS_JSON__", json.dumps(list(i18n.LANGS)))
+        .replace("__LANG_HIDDEN__", "" if len(i18n.LANGS) > 1 else "hidden")
+        .replace("__LANG__", lang)
+        .replace("__LANG_UPPER__", lang.upper())
+        .replace("__LANG_TITLE__", html.escape(i18n.t("header.lang_title", lang)))
+        .replace("__TITLE__", html.escape(i18n.t("login.title", lang)))
+        .replace("__HEADING__", html.escape(i18n.t("login.heading", lang)))
+        .replace("__SUBTEXT__", html.escape(i18n.t("login.subtext", lang)))
+        .replace("__INPUT_ARIA__", html.escape(i18n.t("login.input_aria", lang), quote=True))
+        .replace("__SUBMIT__", html.escape(i18n.t("login.submit", lang)))
         .replace("__NEXT__", html.escape(nxt, quote=True))
         .replace("__ERR__", f'<div class="err">{html.escape(err)}</div>' if err else "")
     )
 
 
-def page_html():
+def page_html(lang=i18n.DEFAULT_LANG):
     try:
         initial_target = resolve(ST.initial_path)
     except (Missing, Denied):
@@ -844,12 +899,20 @@ def page_html():
         "pdfThumbs": HAVE_PDF,
         "preview": HAVE_GROUPDOCS,
         "singleRoot": ST.single_root,
+        "lang": lang,
+        "langs": list(i18n.LANGS),
     }
     title = os.path.basename(next(iter(ST.mounts))) if len(ST.mounts) == 1 else "share·lan"
     return (
-        SHELL.replace("__CSS__", CSS)
-        .replace("__JS__", JS.replace("__CFG__", json.dumps(cfg)))
+        SHELL.replace("__LANG__", lang)
+        .replace("__CSS__", CSS)
+        .replace(
+            "__JS__",
+            JS.replace("__CFG__", json.dumps(cfg)).replace(
+                "__STRINGS__", json.dumps(i18n.flat_table())
+            ),
+        )
         .replace("__TITLE__", html.escape(title))
         .replace("__CODE__", html.escape(ST.code))
-        .replace("__UPLOAD__", UPLOAD_BAR)  # selalu ada, disembunyiin lewat JS
+        .replace("__UPLOAD__", UPLOAD_BAR)  # always present, hidden via JS
     )

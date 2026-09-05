@@ -17,13 +17,13 @@ def human(n):
 def parse_size(text):
     m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*([kmgt]?)b?\s*", str(text), re.I)
     if not m:
-        raise argparse.ArgumentTypeError(f"ukuran nggak kebaca: {text!r} (contoh: 500M, 20G)")
+        raise argparse.ArgumentTypeError(f"couldn't parse size: {text!r} (example: 500M, 20G)")
     mult = {"": 1, "k": 1 << 10, "m": 1 << 20, "g": 1 << 30, "t": 1 << 40}[m.group(2).lower()]
     return int(float(m.group(1)) * mult)
 
 
 class C:
-    """Warna ANSI, mati sendiri kalau output-nya di-pipe."""
+    """ANSI colors, automatically off when output is piped."""
 
     on = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 

@@ -1,4 +1,4 @@
-"""Tes fungsi-fungsi murni: format, sanitasi nama, parsing Range, penamaan mount."""
+"""Tests for pure functions: formatting, name sanitization, Range parsing, mount naming."""
 
 import argparse
 import os
@@ -38,41 +38,41 @@ def test_parse_size(text, expected):
     assert L.parse_size(text) == expected
 
 
-def test_parse_size_menolak_yang_ngaco():
+def test_parse_size_rejects_garbage():
     with pytest.raises(argparse.ArgumentTypeError):
-        L.parse_size("banyak banget")
+        L.parse_size("a whole lot")
 
 
 @pytest.mark.parametrize(
     "raw,expected",
     [
-        ("../../evil.sh", "evil.sh"),  # komponen path dibuang
+        ("../../evil.sh", "evil.sh"),  # path components stripped
         ("foo/bar.txt", "bar.txt"),
-        ("..\\..\\win.exe", "win.exe"),  # separator Windows juga
-        ("CON", "_CON"),  # nama cadangan Windows
+        ("..\\..\\win.exe", "win.exe"),  # Windows separators too
+        ("CON", "_CON"),  # Windows reserved name
         ("nul.txt", "_nul.txt"),
-        ("....", "upload"),  # titik doang -> nama cadangan
+        ("....", "upload"),  # dots only -> fallback name
         ("", "upload"),
-        ("  spasi  .txt", "spasi .txt"),
+        ("  space  .txt", "space .txt"),
     ],
 )
 def test_safe_upload_name(raw, expected):
     assert L.safe_upload_name(raw) == expected
 
 
-def test_safe_upload_name_buang_karakter_kontrol():
+def test_safe_upload_name_strips_control_chars():
     assert "\x00" not in L.safe_upload_name("a\x00b.txt")
     assert "\n" not in L.safe_upload_name("a\nb.txt")
 
 
-def test_safe_upload_name_batasi_panjang():
-    hasil = L.safe_upload_name("A" * 500 + ".txt")
-    assert len(os.path.splitext(hasil)[0]) <= 200
+def test_safe_upload_name_limits_length():
+    result = L.safe_upload_name("A" * 500 + ".txt")
+    assert len(os.path.splitext(result)[0]) <= 200
 
 
-def test_safe_upload_name_hindari_bentrok_part():
-    # File .part dipakai buat upload yang belum kelar - nama upload nggak boleh nyamar
-    assert not L.safe_upload_name("nyamar.part").endswith(".part")
+def test_safe_upload_name_avoids_part_collision():
+    # .part files are used for in-progress uploads - an upload name mustn't impersonate one
+    assert not L.safe_upload_name("disguise.part").endswith(".part")
 
 
 @pytest.mark.parametrize(
@@ -81,44 +81,44 @@ def test_safe_upload_name_hindari_bentrok_part():
         ("bytes=0-99", 1000, (0, 99)),
         ("bytes=500-", 1000, (500, 999)),
         ("bytes=-100", 1000, (900, 999)),
-        ("bytes=0-99999", 1000, (0, 999)),  # dipotong ke ukuran file
-        ("bytes=0-99,200-299", 1000, "full"),  # multi-range -> kirim penuh
+        ("bytes=0-99999", 1000, (0, 999)),  # clamped to the file size
+        ("bytes=0-99,200-299", 1000, "full"),  # multi-range -> send in full
         ("bytes=abc", 1000, "full"),
-        ("bytes=2000-", 1000, "unsat"),  # lewat ujung file
+        ("bytes=2000-", 1000, "unsat"),  # past the end of the file
         (None, 1000, None),
-        ("kambing=0-9", 1000, None),
+        ("goat=0-9", 1000, None),
     ],
 )
 def test_parse_range(header, size, expected):
     assert L.parse_range(header, size) == expected
 
 
-def test_unique_name_bikin_basename_kembar_beda():
-    taken = {"laporan.pdf": 1}
-    assert L.unique_name("laporan.pdf", taken) == "laporan (2).pdf"
-    taken["laporan (2).pdf"] = 1
-    assert L.unique_name("laporan.pdf", taken) == "laporan (3).pdf"
+def test_unique_name_differentiates_duplicate_basenames():
+    taken = {"report.pdf": 1}
+    assert L.unique_name("report.pdf", taken) == "report (2).pdf"
+    taken["report (2).pdf"] = 1
+    assert L.unique_name("report.pdf", taken) == "report (3).pdf"
 
 
-def test_build_mounts_pakai_basename_bukan_path_asli(tree):
-    mounts = L.build_mounts([str(tree / "Dokumen"), str(tree / "klip.mp4")])
-    assert list(mounts) == ["Dokumen", "klip.mp4"]
-    assert mounts["klip.mp4"] == str(tree / "klip.mp4")
+def test_build_mounts_uses_basename_not_full_path(tree):
+    mounts = L.build_mounts([str(tree / "Documents"), str(tree / "clip.mp4")])
+    assert list(mounts) == ["Documents", "clip.mp4"]
+    assert mounts["clip.mp4"] == str(tree / "clip.mp4")
 
 
-def test_build_mounts_bedain_basename_kembar(tree):
+def test_build_mounts_differentiates_duplicate_basenames(tree):
     mounts = L.build_mounts(
-        [str(tree / "Dokumen" / "catatan.txt"), str(tree / "lain" / "catatan.txt")]
+        [str(tree / "Documents" / "notes.txt"), str(tree / "other" / "notes.txt")]
     )
-    assert list(mounts) == ["catatan.txt", "catatan (2).txt"]
-    # yang penting isinya nggak ketuker
-    assert open(mounts["catatan (2).txt"]).read() == "versi lain"
+    assert list(mounts) == ["notes.txt", "notes (2).txt"]
+    # what matters is the contents aren't swapped
+    assert open(mounts["notes (2).txt"]).read() == "other version"
 
 
-def test_build_mounts_nolak_path_ngaco(tree, capsys):
+def test_build_mounts_rejects_bad_path(tree, capsys):
     with pytest.raises(SystemExit):
-        L.build_mounts([str(tree / "gaib")])
-    assert "gaib" in capsys.readouterr().err
+        L.build_mounts([str(tree / "ghost")])
+    assert "ghost" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
@@ -138,9 +138,10 @@ def test_kind_of(name, expected):
     assert L.kind_of(name, True) == "dir"
 
 
-def test_tanpa_argumen_nggak_ngebagiin_apa_apa():
-    """Jalan kosong itu aman: server nyala tapi nol file kebuka. Yang bahaya itu
-    diam-diam default ke folder aktif - source code bisa kebagi tanpa disadari."""
+def test_no_args_shares_nothing():
+    """Running with no args is safe: the server starts but zero files are open. The
+    dangerous alternative would be silently defaulting to the current folder - source
+    code could end up shared without anyone noticing."""
     cfg = L.parse_args([])
     assert cfg.paths == []
     L.configure(cfg)
@@ -148,46 +149,46 @@ def test_tanpa_argumen_nggak_ngebagiin_apa_apa():
     assert L.ST.initial_path == ""
 
 
-def test_nambah_dan_nyabut_path_sambil_jalan(tree):
+def test_add_and_remove_path_while_running(tree):
     L.configure(L.parse_args([]))
-    rev_awal = L.ST.revision
+    rev_start = L.ST.revision
 
-    added, skipped, bad = L.add_paths([str(tree / "klip.mp4")])
-    assert [n for n, _ in added] == ["klip.mp4"]
-    assert L.ST.mounts["klip.mp4"] == str(tree / "klip.mp4")
-    assert L.ST.revision > rev_awal  # klien polling ini buat tau ada perubahan
+    added, skipped, bad = L.add_paths([str(tree / "clip.mp4")])
+    assert [n for n, _ in added] == ["clip.mp4"]
+    assert L.ST.mounts["clip.mp4"] == str(tree / "clip.mp4")
+    assert L.ST.revision > rev_start  # polling clients use this to detect a change
 
-    # path yang sama nggak didobelin
-    assert L.add_paths([str(tree / "klip.mp4")])[1] == [str(tree / "klip.mp4")]
+    # the same path isn't added twice
+    assert L.add_paths([str(tree / "clip.mp4")])[1] == [str(tree / "clip.mp4")]
     assert len(L.ST.mounts) == 1
 
-    # path ngaco dilaporin, bukan bikin server mati
-    assert L.add_paths([str(tree / "gaib.txt")])[2][0][1] == "nggak ada"
+    # a bad path is reported, not a reason to bring the server down
+    assert L.add_paths([str(tree / "ghost.txt")])[2][0][1] == "not found"
 
-    assert L.remove_mount("klip.mp4") == "klip.mp4"
+    assert L.remove_mount("clip.mp4") == "clip.mp4"
     assert L.ST.mounts == {}
 
 
-def test_nyabut_pakai_nomor_urut(tree):
-    L.configure(L.parse_args([str(tree / "Dokumen"), str(tree / "klip.mp4")]))
-    assert L.remove_mount("2") == "klip.mp4"
-    assert list(L.ST.mounts) == ["Dokumen"]
+def test_remove_by_index(tree):
+    L.configure(L.parse_args([str(tree / "Documents"), str(tree / "clip.mp4")]))
+    assert L.remove_mount("2") == "clip.mp4"
+    assert list(L.ST.mounts) == ["Documents"]
 
 
-def test_can_upload_here_ngikut_target(tree):
-    """Nggak ada lagi folder upload global: bisa nggaknya upload ditentukan
-    per-folder (hasil resolve), bukan status global."""
-    L.configure(L.parse_args([str(tree / "klip.mp4"), str(tree / "lain")]))
-    # mount yang isinya cuma file -> bukan folder -> nggak bisa upload di situ
-    assert L.can_upload_here(L.resolve("klip.mp4")) is False
-    # folder writable -> bisa upload
-    assert L.can_upload_here(L.resolve("lain")) is True
-    # root virtual (banyak mount) -> nggak ada folder tujuan -> nggak bisa upload
+def test_can_upload_here_follows_target(tree):
+    """There's no global upload folder anymore: whether upload is allowed is decided
+    per-folder (from the resolved target), not by a global flag."""
+    L.configure(L.parse_args([str(tree / "clip.mp4"), str(tree / "other")]))
+    # a mount that's just a file -> not a folder -> can't upload there
+    assert L.can_upload_here(L.resolve("clip.mp4")) is False
+    # a writable folder -> upload allowed
+    assert L.can_upload_here(L.resolve("other")) is True
+    # virtual root (multiple mounts) -> no target folder -> upload not allowed
     assert L.can_upload_here(L.resolve(None)) is False
 
 
-def test_titik_eksplisit_tetap_boleh(tmp_path, monkeypatch):
-    (tmp_path / "a.txt").write_text("hai")
+def test_explicit_dot_still_allowed(tmp_path, monkeypatch):
+    (tmp_path / "a.txt").write_text("hi")
     monkeypatch.chdir(tmp_path)
     mounts = L.build_mounts(["."])
     assert list(mounts) == [tmp_path.name]

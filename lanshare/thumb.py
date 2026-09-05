@@ -10,7 +10,7 @@ try:
     from PIL import Image, ImageOps
 
     HAVE_PIL = True
-except Exception:  # Pillow opsional - tanpa dia thumbnail mati, sisanya jalan
+except Exception:  # Pillow is optional - without it thumbnails are off, everything else works
     HAVE_PIL = False
 
 try:
@@ -20,10 +20,10 @@ try:
 except ImportError:
     HAVE_PDF = False
 
-# PDFium tidak thread-safe, termasuk saat membuka/menutup dokumen.
+# PDFium is not thread-safe, including when opening/closing documents.
 _pdf_lock = threading.Lock()
 
-SVG_THUMB_MAX = 256 * 1024  # SVG lebih besar dari ini nggak dikirim sebagai thumb
+SVG_THUMB_MAX = 256 * 1024  # SVGs larger than this aren't sent as a thumbnail
 
 
 def _pdf_thumb(path, box):
@@ -88,7 +88,7 @@ def sha256_of(path):
 
 
 def make_thumb(path, box=360):
-    """(bytes, content_type) kecil buat preview. None kalau nggak bisa - UI mundur ke ikon."""
+    """Small (bytes, content_type) for preview. None if it can't - UI falls back to an icon."""
     if not HAVE_PIL:
         return None
     ext = os.path.splitext(path)[1].lower()
@@ -131,11 +131,11 @@ def _image_thumb(path, box):
 
 
 def _svg_thumb(path):
-    """SVG-nya sendiri jadi thumbnail - browser merendernya native di <img>."""
+    """The SVG itself becomes the thumbnail - the browser renders it natively in an <img>."""
     if os.path.getsize(path) > SVG_THUMB_MAX:
-        raise ValueError("SVG kegedean buat dijadiin thumb")
+        raise ValueError("SVG too large to use as a thumbnail")
     with open(path, "rb") as f:
         data = f.read()
     if b"<svg" not in data:
-        raise ValueError("bukan SVG")
+        raise ValueError("not an SVG")
     return data, "image/svg+xml"

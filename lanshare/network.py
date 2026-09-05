@@ -8,7 +8,7 @@ WIRED = re.compile(r"^(en|eth|wl|wlan)")
 
 
 def _iface_addrs():
-    """[(ip, nama_interface)] dari ifconfig / ip addr. Kosong kalau nggak ada dua-duanya."""
+    """[(ip, interface_name)] from ifconfig / ip addr. Empty if neither is available."""
     for cmd in (["ifconfig", "-a"], ["ip", "-4", "-o", "addr"]):
         try:
             out = subprocess.run(cmd, capture_output=True, timeout=4).stdout.decode(
@@ -24,7 +24,7 @@ def _iface_addrs():
             m2 = re.search(r"\binet (?:addr:)?(\d+\.\d+\.\d+\.\d+)", line)
             if m2:
                 name = iface
-                m3 = re.match(r"^\d+:\s*(\S+)", line)  # format `ip -o`
+                m3 = re.match(r"^\d+:\s*(\S+)", line)  # `ip -o` format
                 if m3:
                     name = m3.group(1)
                 found.append((m2.group(1), name or ""))
@@ -36,7 +36,7 @@ def _iface_addrs():
 def _route_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        s.connect(("8.8.8.8", 80))  # nggak ngirim paket, cuma minta routing table nunjuk interface
+        s.connect(("8.8.8.8", 80))  # sends no packet, just asks the routing table which interface
         return s.getsockname()[0]
     except OSError:
         return None
@@ -70,7 +70,7 @@ def _score(ip, iface, is_route):
 
 
 def find_addresses():
-    """[(ip, iface, skor)] urut dari yang paling mungkin kepakai."""
+    """[(ip, iface, score)] sorted from most to least likely to be the right one."""
     route = _route_ip()
     seen = {}
     for ip, iface in _iface_addrs():

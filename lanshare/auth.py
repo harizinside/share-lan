@@ -5,7 +5,7 @@ from .banner import print_banner
 from .fmt import C
 from .state import SESSION_TTL, ST
 
-FAILS_STALE_TTL = 3600  # ip yang udah lama nggak nyoba lagi (dan nggak lagi dikunci) dibuang
+FAILS_STALE_TTL = 3600  # an IP that hasn't tried in a while (and isn't locked) gets dropped
 
 
 def new_code(length):
@@ -45,7 +45,7 @@ def lock_left(ip):
 
 
 def check_code(ip, given):
-    """True kalau kodenya bener. Salah -> kunci per-IP naik bertingkat."""
+    """True if the code is correct. Wrong -> escalating per-IP lockout."""
     if lock_left(ip):
         return False
     ok = bool(given) and secrets.compare_digest(str(given), ST.code)
@@ -74,16 +74,19 @@ def check_code(ip, given):
             rec[1] = time.time() + wait
             rec[0] = 0
             print(
-                f"\n  {C.warn('⚠')} 5x kode salah dari {C.bold(ip)} - dikunci {wait // 60}m {wait % 60}s\n",
+                f"\n  {C.warn('⚠')} 5 wrong codes from {C.bold(ip)} - locked for {wait // 60}m {wait % 60}s\n",
                 flush=True,
             )
-        # Di LAN, ganti IP itu gampang, jadi kunci per-IP doang bisa diakalin.
+        # On a LAN, changing IP is easy, so a per-IP lockout alone can be worked around.
         if ST.global_fails >= 50:
             ST.global_fails = 0
             ST.code = new_code(ST.cfg.code_len)
-            ST.sessions.clear()  # kode diganti karena dicurigai diserang - sesi lama ikut dicabut
+            ST.sessions.clear()  # code rotated on suspicion of an attack - old sessions revoked too
             rotated = True
     if rotated:
-        print(f"\n  {C.warn('⚠')} Kebanyakan tebakan salah. Kode diganti otomatis.\n", flush=True)
+        print(
+            f"\n  {C.warn('⚠')} Too many wrong guesses. Code was rotated automatically.\n",
+            flush=True,
+        )
         print_banner(reprint=True)
     return False

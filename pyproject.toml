@@ -1,7 +1,7 @@
 [project]
 name = "share-lan"
-version = "0.0.2"
-description = "Bagi file ke satu jaringan WiFi/LAN — penerima tinggal scan QR atau ketik IP + kode 4 digit"
+version = "0.0.3"
+description = "Share files over a WiFi/LAN network — recipients just scan a QR or type the IP + a 4-digit code"
 requires-python = ">=3.9"
 dependencies = [
     "qrcode",
@@ -33,12 +33,12 @@ target-version = "py39"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "C4"]
 ignore = [
-    "E501",    # panjang baris diurus formatter, bukan dilaporin
-    "B008",    # panggilan fungsi di argumen default: nggak dipakai di sini
+    "E501",    # line length is handled by the formatter, not reported here
+    "B008",    # function calls in default arguments: not used that way here
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E402"]  # tes nyisipin sys.path sebelum import lanshare
+"tests/*" = ["E402"]  # tests insert into sys.path before importing lanshare
 
 [tool.ruff.format]
 quote-style = "double"
