@@ -29,7 +29,6 @@ class State:
         self.sessions = {}  # token -> waktu kedaluwarsa
         self.fails = {}  # ip -> [gagal, dikunci_sampai, ronde]
         self.global_fails = 0
-        self.upload_dir = None
         self.initial_path = ""
         self.single_file = None
         self.base_url = ""

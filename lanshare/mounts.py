@@ -37,16 +37,11 @@ def build_mounts(paths):
 
 
 def recompute():
-    """Dipanggil tiap daftar bagikan berubah: nentuin bentuk root + tujuan upload."""
+    """Dipanggil tiap daftar bagikan berubah: nentuin bentuk root."""
     items = list(ST.mounts.items())
     ST.single_root = len(items) == 1 and os.path.isdir(items[0][1])
     ST.initial_path = items[0][0] if ST.single_root else ""
     ST.single_file = items[0][0] if len(items) == 1 and os.path.isfile(items[0][1]) else None
-    if not ST.cfg.upload_to:
-        ST.upload_dir = next(
-            (p for p in ST.mounts.values() if os.path.isdir(p) and os.access(p, os.W_OK)),
-            None,
-        )
     ST.revision += 1
 
 
@@ -114,6 +109,16 @@ def resolve(p):
     if target != base and not target.startswith(base + os.sep):
         raise Denied(p)  # nutup ../ sekaligus symlink yang nunjuk keluar
     return target
+
+
+def can_upload_here(target):
+    """Target (hasil resolve) boleh dipakai buat nyimpen upload? None = root virtual."""
+    return (
+        not ST.cfg.read_only
+        and target is not None
+        and os.path.isdir(target)
+        and os.access(target, os.W_OK)
+    )
 
 
 def visible(name):

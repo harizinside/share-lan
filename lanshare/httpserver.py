@@ -11,7 +11,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from . import fmt
 from .auth import check_code, lock_left, new_session, valid_session
 from .fmt import C, human
-from .mounts import Denied, Missing, list_entries, resolve, safe_upload_name, total_stats
+from .mounts import (
+    Denied,
+    Missing,
+    can_upload_here,
+    list_entries,
+    resolve,
+    safe_upload_name,
+    total_stats,
+)
 from .pages import ERROR_PAGE, login_page, page_html
 from .qr import qr_svg
 from .state import APP, CHUNK, INLINE_EXT, SESSION_TTL, ST
@@ -281,8 +289,20 @@ class Handler(BaseHTTPRequestHandler):
             return self.fail(401, "Perlu kode akses.")
         if parsed.path != "/up":
             return self.fail(404, "Nggak ada.")
-        if ST.cfg.read_only or not ST.upload_dir:
+        if ST.cfg.read_only:
             return self.fail(403, "Upload dimatiin.")
+        p = self.qget(qs, "p")
+        try:
+            target = resolve(p)
+        except Missing:
+            return self.fail(404, "Folder nggak ketemu.")
+        except Denied:
+            return self.fail(403, "Di luar folder yang dibagikan.")
+        if target is None or not os.path.isdir(target):
+            return self.fail(404, "Bukan folder.")
+        if not os.access(target, os.W_OK):
+            return self.fail(403, "Folder ini nggak bisa ditulisi.")
+        folder = target
         try:
             length = int(self.headers.get("Content-Length") or "")
         except ValueError:
@@ -290,14 +310,14 @@ class Handler(BaseHTTPRequestHandler):
         if ST.cfg.max_upload and length > ST.cfg.max_upload:
             return self.fail(413, f"Maksimal {human(ST.cfg.max_upload)} per file.")
         try:
-            free = shutil.disk_usage(ST.upload_dir).free
+            free = shutil.disk_usage(folder).free
         except OSError:
             free = None
         if free is not None and length + (1 << 30) > free:
             return self.fail(507, "Sisa disk nggak cukup.")
 
         name = safe_upload_name(self.qget(qs, "name"))
-        dest = unique_path(ST.upload_dir, name)
+        dest = unique_path(folder, name)
         tmp = dest + ".part"
         got = 0
         try:
@@ -479,7 +499,7 @@ class Handler(BaseHTTPRequestHandler):
                 "entries": page,
                 "next_cursor": nxt,
                 "rev": ST.revision,
-                "can_upload": bool(ST.upload_dir) and not ST.cfg.read_only,
+                "can_upload": can_upload_here(target),
                 "single_root": ST.single_root,
                 "shared_count": len(ST.mounts),
             }

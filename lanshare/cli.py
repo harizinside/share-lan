@@ -69,9 +69,6 @@ def parse_args(argv=None):
     ap.add_argument("--code", help="kode akses sendiri (default: acak)")
     ap.add_argument("--code-len", type=int, default=4, help="panjang kode acak (default 4)")
     ap.add_argument(
-        "--upload-to", help="folder tujuan upload (default: folder pertama yang dibagikan)"
-    )
-    ap.add_argument(
         "--max-upload", type=parse_size, default=0, help="batas ukuran per upload, mis. 2G"
     )
     ap.add_argument("--read-only", action="store_true", help="matiin upload")
@@ -97,11 +94,6 @@ def configure(cfg):
         die("--code nggak boleh kosong.")
 
     ST.mounts = build_mounts(cfg.paths)
-    if cfg.upload_to:
-        up = os.path.realpath(os.path.expanduser(cfg.upload_to))
-        if not os.path.isdir(up):
-            die(f"--upload-to bukan folder: {cfg.upload_to}")
-        ST.upload_dir = up
     recompute()
     ST.addresses = find_addresses()
     return ST
@@ -130,7 +122,7 @@ def main(argv=None):
     print_banner()
     if cfg.read_only:
         print(f"  {C.dim('Mode baca-saja: upload dimatiin.')}\n")
-    elif not ST.upload_dir:
+    elif not any(os.path.isdir(p) and os.access(p, os.W_OK) for p in ST.mounts.values()):
         print(f"  {C.dim('Nggak ada folder yang bisa ditulis, jadi upload dimatiin.')}\n")
 
     if console_available():

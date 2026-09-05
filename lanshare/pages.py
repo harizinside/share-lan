@@ -2,8 +2,9 @@ import html
 import json
 import os
 
+from .mounts import Denied, Missing, can_upload_here, resolve
 from .state import ST
-from .thumb import HAVE_PIL
+from .thumb import HAVE_PDF, HAVE_PIL
 
 CSS = r"""
 *{box-sizing:border-box}
@@ -113,6 +114,7 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 .tb{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
   opacity:0;transition:opacity .25s}
 .tb.on{opacity:1}
+.tb.pdf{object-position:top;background:#fff}
 .row .name{flex:1;min-width:0;font-weight:550;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
 .row .meta{color:var(--muted);font-size:12.5px;flex:none}
@@ -391,8 +393,9 @@ const escA = s => esc(s).replace(/"/g,"&quot;");
 
 /* Lazy-load bawaan browser: kalau thumbnail gagal, <img> dibuang dan ikonnya
    yang keliatan lagi - jadi nggak ada state kosong. */
-const thumbTag = e => (CFG.thumbs && e.kind === "image")
-  ? `<img class="tb" loading="lazy" decoding="async" alt="" src="/thumb?p=${enc(e.path)}"
+const isPdf = e => !e.dir && /\.pdf$/i.test(e.name);
+const thumbTag = e => (CFG.thumbs && (e.kind === "image" || (CFG.pdfThumbs && isPdf(e))))
+  ? `<img class="tb${isPdf(e)?' pdf':''}" loading="lazy" decoding="async" alt="" src="/thumb?p=${enc(e.path)}"
        onload="this.classList.add('on')" onerror="this.remove()">` : "";
 
 function syncUpload(){
@@ -434,7 +437,7 @@ function upload(files){
     $("#jobs").append(el);
     const bar=el.querySelector("i"), st=el.querySelector(".st");
     const xhr=new XMLHttpRequest(); const t0=Date.now();
-    xhr.open("PUT", `/up?name=${enc(f.name)}`);
+    xhr.open("PUT", `/up?name=${enc(f.name)}&p=${enc(S.path)}`);
     xhr.upload.onprogress=ev=>{
       if(!ev.lengthComputable) return;
       const pct=ev.loaded/ev.total, sec=(Date.now()-t0)/1000;
@@ -620,11 +623,16 @@ def login_page(err="", nxt="/"):
 
 
 def page_html():
+    try:
+        initial_target = resolve(ST.initial_path)
+    except (Missing, Denied):
+        initial_target = None
     cfg = {
         "initial": ST.initial_path,
         "code": ST.code,
-        "canUpload": bool(ST.upload_dir) and not ST.cfg.read_only,
+        "canUpload": can_upload_here(initial_target),
         "thumbs": HAVE_PIL,
+        "pdfThumbs": HAVE_PDF,
         "singleRoot": ST.single_root,
     }
     title = os.path.basename(next(iter(ST.mounts))) if len(ST.mounts) == 1 else "share·lan"

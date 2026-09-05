@@ -65,7 +65,7 @@ def test_listing_root_nampilin_mount(server):
     import json
 
     data = json.loads(server.get("/api/list")[1] and server.get("/api/list")[2])
-    assert [e["name"] for e in data["entries"]] == ["Dokumen", "Galeri", "klip.mp4"]
+    assert [e["name"] for e in data["entries"]] == ["Dokumen", "Galeri", "lain", "klip.mp4"]
     assert data["parent"] is None
 
 
@@ -168,7 +168,7 @@ def test_zipinfo_bilang_bisa_resume_atau_nggak(server):
 def test_upload_masuk_dan_nama_bentrok_diberi_nomor(server, tree):
     server.login("4815")
     for expected in ("kirim.bin", "kirim (2).bin"):
-        status, _, body = server.request("PUT", "/up?name=kirim.bin", body=b"x" * 100)
+        status, _, body = server.request("PUT", "/up?name=kirim.bin&p=lain", body=b"x" * 100)
         assert status == 200
         assert expected.encode() in body
     assert (tree / "lain" / "kirim (2).bin").exists()
@@ -176,7 +176,7 @@ def test_upload_masuk_dan_nama_bentrok_diberi_nomor(server, tree):
 
 def test_upload_nama_jahat_gak_nembus_keluar(server, tree):
     server.login("4815")
-    server.request("PUT", "/up?name=..%2F..%2Fevil.sh", body=b"x")
+    server.request("PUT", "/up?name=..%2F..%2Fevil.sh&p=lain", body=b"x")
     assert (tree / "lain" / "evil.sh").exists()
     assert not (tree / "evil.sh").exists()
     assert not (tree.parent / "evil.sh").exists()
@@ -184,7 +184,9 @@ def test_upload_nama_jahat_gak_nembus_keluar(server, tree):
 
 def test_upload_butuh_content_length(server):
     server.login("4815")
-    status, _, _ = server.request("PUT", "/up?name=a.bin", headers={"Transfer-Encoding": "chunked"})
+    status, _, _ = server.request(
+        "PUT", "/up?name=a.bin&p=lain", headers={"Transfer-Encoding": "chunked"}
+    )
     assert status == 411
 
 
@@ -192,7 +194,7 @@ def test_read_only_nolak_upload(tree):
     httpd, client = start([tree / "Dokumen"], ["--read-only"])
     try:
         client.login("4815")
-        assert client.request("PUT", "/up?name=a.bin", body=b"x")[0] == 403
+        assert client.request("PUT", "/up?name=a.bin&p=Dokumen", body=b"x")[0] == 403
     finally:
         httpd.shutdown()
         httpd.server_close()
@@ -202,7 +204,67 @@ def test_max_upload_ditegakkan(tree):
     httpd, client = start([tree / "Dokumen"], ["--max-upload", "10"])
     try:
         client.login("4815")
-        assert client.request("PUT", "/up?name=a.bin", body=b"x" * 100)[0] == 413
+        assert client.request("PUT", "/up?name=a.bin&p=Dokumen", body=b"x" * 100)[0] == 413
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_upload_ikut_subfolder_yang_lagi_dibuka(server, tree):
+    """Inti bug fix: upload harus nyangkut di subfolder yang lagi dibuka, bukan root."""
+    server.login("4815")
+    status, _, _ = server.request("PUT", "/up?name=sub.bin&p=Dokumen/arsip", body=b"y" * 100)
+    assert status == 200
+    assert (tree / "Dokumen" / "arsip" / "sub.bin").exists()
+    assert not (tree / "sub.bin").exists()
+    assert not (tree / "Dokumen" / "sub.bin").exists()
+
+
+def test_upload_tanpa_folder_atau_root_virtual_ditolak(server, tree):
+    """Server fixture punya lebih dari satu mount -> root virtual. Tanpa `p` nggak
+    ada folder tujuan yang jelas, jadi harus ditolak."""
+    server.login("4815")
+    assert server.request("PUT", "/up?name=a.bin", body=b"x")[0] == 404
+    assert server.request("PUT", "/up?name=a.bin&p=", body=b"x")[0] == 404
+
+
+def test_upload_lompat_keluar_mount_ditolak(server):
+    server.login("4815")
+    status, _, _ = server.request("PUT", "/up?name=a.bin&p=Dokumen/..%2F..%2Fetc", body=b"x")
+    assert status == 403
+
+
+def test_upload_ke_mount_file_ditolak(server):
+    """Mount yang isinya cuma satu file (bukan folder) nggak bisa jadi tujuan upload."""
+    server.login("4815")
+    assert server.request("PUT", "/up?name=a.bin&p=klip.mp4", body=b"x")[0] == 404
+
+
+def test_upload_tujuan_nunjuk_file_bukan_folder_ditolak(server):
+    """`p` nunjuk ke file di dalam folder -> bukan folder, ditolak."""
+    server.login("4815")
+    assert server.request("PUT", "/up?name=a.bin&p=Dokumen/catatan.txt", body=b"x")[0] == 404
+
+
+def test_can_upload_ngikut_writability_folder(tree):
+    """can_upload beda per folder: folder yang bisa ditulis nyala, yang nggak bisa ditiadain."""
+    import json
+
+    baca_saja = tree / "Dokumen" / "baca-saja"
+    baca_saja.mkdir()
+    httpd, client = start([tree / "Dokumen"], [])
+    try:
+        client.login("4815")
+        assert json.loads(client.get("/api/list?p=Dokumen")[2])["can_upload"] is True
+        try:
+            baca_saja.chmod(0o555)
+            gak_bisa = json.loads(client.get("/api/list?p=Dokumen/baca-saja")[2])["can_upload"]
+        finally:
+            baca_saja.chmod(0o755)
+        import os
+
+        if os.geteuid() != 0:  # root nembus permission -> biarin flaky
+            assert gak_bisa is False
     finally:
         httpd.shutdown()
         httpd.server_close()
@@ -254,6 +316,33 @@ def test_thumbnail_gambar(server):
 def test_thumbnail_bukan_gambar_ngasih_404(server):
     server.login("4815")
     assert server.get("/thumb?p=klip.mp4")[0] == 404
+
+
+def test_thumbnail_pdf_setengah_atas_halaman_pertama(server, tree):
+    from PIL import Image, ImageDraw
+
+    path = tree / "Dokumen" / "preview.PDF"
+    first = Image.new("RGB", (400, 600), "red")
+    ImageDraw.Draw(first).rectangle((0, 300, 399, 599), fill="blue")
+    second = Image.new("RGB", (400, 600), "green")
+    first.save(path, "PDF", save_all=True, append_images=[second])
+    assert server.get("/thumb?p=Dokumen/preview.PDF")[0] == 302
+    server.login("4815")
+    status, headers, body = server.get("/thumb?p=Dokumen/preview.PDF")
+    assert status == 200
+    assert headers["Content-Type"] == "image/jpeg"
+    with Image.open(io.BytesIO(body)) as preview:
+        assert preview.size == (360, 270)
+        for xy in ((180, 10), (180, 260)):
+            r, g, b = preview.getpixel(xy)
+            assert r > 200 and g < 30 and b < 30
+    assert server.get("/thumb?p=Dokumen/preview.PDF")[2] == body
+
+
+def test_thumbnail_pdf_rusak_ngasih_404(server, tree):
+    (tree / "Dokumen" / "rusak.pdf").write_bytes(b"bukan PDF")
+    server.login("4815")
+    assert server.get("/thumb?p=Dokumen/rusak.pdf")[0] == 404
 
 
 def test_server_kosong_gak_ngebocorin_apa_apa(tree):

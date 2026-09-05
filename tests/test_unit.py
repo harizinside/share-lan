@@ -145,7 +145,6 @@ def test_tanpa_argumen_nggak_ngebagiin_apa_apa():
     assert cfg.paths == []
     L.configure(cfg)
     assert L.ST.mounts == {}
-    assert L.ST.upload_dir is None
     assert L.ST.initial_path == ""
 
 
@@ -175,11 +174,16 @@ def test_nyabut_pakai_nomor_urut(tree):
     assert list(L.ST.mounts) == ["Dokumen"]
 
 
-def test_nambah_folder_nyalain_upload(tree):
-    L.configure(L.parse_args([str(tree / "klip.mp4")]))
-    assert L.ST.upload_dir is None  # cuma file: nggak ada tempat naro upload
-    L.add_paths([str(tree / "lain")])
-    assert L.ST.upload_dir == str(tree / "lain")
+def test_can_upload_here_ngikut_target(tree):
+    """Nggak ada lagi folder upload global: bisa nggaknya upload ditentukan
+    per-folder (hasil resolve), bukan status global."""
+    L.configure(L.parse_args([str(tree / "klip.mp4"), str(tree / "lain")]))
+    # mount yang isinya cuma file -> bukan folder -> nggak bisa upload di situ
+    assert L.can_upload_here(L.resolve("klip.mp4")) is False
+    # folder writable -> bisa upload
+    assert L.can_upload_here(L.resolve("lain")) is True
+    # root virtual (banyak mount) -> nggak ada folder tujuan -> nggak bisa upload
+    assert L.can_upload_here(L.resolve(None)) is False
 
 
 def test_titik_eksplisit_tetap_boleh(tmp_path, monkeypatch):

@@ -91,9 +91,7 @@ def start(tmp_paths, extra=None):
 
 @pytest.fixture
 def server(tree):
-    httpd, client = start(
-        [tree / "Dokumen", tree / "Galeri", tree / "klip.mp4"], ["--upload-to", str(tree / "lain")]
-    )
+    httpd, client = start([tree / "Dokumen", tree / "Galeri", tree / "lain", tree / "klip.mp4"], [])
     yield client
     httpd.shutdown()
     httpd.server_close()

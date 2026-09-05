@@ -69,7 +69,7 @@ Halaman yang **udah kebuka di HP orang bakal update sendiri** dalam beberapa det
 
 ### Nggak ada file yang disalin
 
-Yang disimpan server cuma **path**-nya. File 200 GB di `~/Documents` tetap duduk di `~/Documents` — dibaca langsung dari situ pas ada yang download, nggak pernah dipindah, disalin, atau ditaruh di folder tempat lu jalanin. Satu-satunya hal yang beneran ditulis ke disk itu **file yang orang lain upload ke lu**, dan itu masuk ke folder yang lu tentuin (`--upload-to`, atau folder pertama yang bisa ditulis).
+Yang disimpan server cuma **path**-nya. File 200 GB di `~/Documents` tetap duduk di `~/Documents` — dibaca langsung dari situ pas ada yang download, nggak pernah dipindah, disalin, atau ditaruh di folder tempat lu jalanin. Satu-satunya hal yang beneran ditulis ke disk itu **file yang orang lain upload ke lu**, dan itu masuk ke folder yang **lagi dibuka penerima pas upload** — bukan lompat ke root.
 
 Kalau yang lu drop cuma **satu file**, QR-nya nunjuk persis ke file itu — scan, langsung kedownload, tanpa mampir ke daftar.
 
@@ -132,7 +132,6 @@ lanshare [PATH ...]
   --ip ADDR             paksa alamat yang ditampilin di QR
   --code KODE           kode akses sendiri (default: acak)
   --code-len N          panjang kode acak (default 4)
-  --upload-to DIR       folder tujuan upload (default: folder pertama yang dibagikan)
   --max-upload UKURAN   batas per upload, mis. 2G
   --read-only           matiin upload
   --hidden              ikutin file/folder tersembunyi
