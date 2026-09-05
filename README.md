@@ -1,5 +1,9 @@
 # share·lan
 
+[![Release](https://img.shields.io/github/v/release/harizinside/share-lan)](https://github.com/harizinside/share-lan/releases/latest)
+[![Docker Publish](https://github.com/harizinside/share-lan/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/harizinside/share-lan/actions/workflows/docker-publish.yml)
+[![GHCR](https://img.shields.io/badge/ghcr.io-share--lan-2496ED?logo=docker&logoColor=white)](https://github.com/harizinside/share-lan/pkgs/container/share-lan)
+
 Bagi file ke satu jaringan WiFi/LAN. Penerima tinggal **scan QR** (HP) atau **ketik IP + kode 4 digit** (laptop). Nggak ada cloud, nggak ada akun, penerima nggak perlu install apa pun — cukup browser.
 
 ```bash
