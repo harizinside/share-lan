@@ -5,7 +5,7 @@ CHUNK = 1 << 20
 ZIP64_LIMIT = 0xFFFFFFFF
 SESSION_TTL = 86400
 THUMB_CACHE_MAX = 500  # entri; ~30KB/thumb -> ~15MB batas atas
-IMAGE_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff", ".avif"}
+IMAGE_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".tif", ".tiff", ".avif"}
 VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".mpg", ".mpeg"}
 AUDIO_EXT = {".mp3", ".m4a", ".wav", ".flac", ".ogg", ".aac", ".opus"}
 INLINE_EXT = IMAGE_EXT | VIDEO_EXT | AUDIO_EXT | {".pdf", ".txt", ".md"}
@@ -35,7 +35,7 @@ class State:
         self.lock = threading.Lock()
         self.crc_cache = {}  # (path, size, mtime) -> crc32
         self.hash_cache = {}  # (path, size, mtime) -> sha256
-        self.thumb_cache = {}  # (path, size, mtime, box) -> bytes JPEG
+        self.thumb_cache = {}  # (path, size, mtime, box) -> (bytes, content_type)
         self.zip_plans = {}  # path -> (tanda tangan isi, segmen, ukuran)
         self.single_root = False  # cuma 1 folder yang dishare -> folder itu jadi root
         self.addresses = []  # [(ip, iface, skor)]

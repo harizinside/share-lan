@@ -326,6 +326,20 @@ def test_thumbnail_gambar(server):
     assert len(body) < 60000  # jauh lebih kecil dari aslinya
 
 
+@pytest.mark.skipif(not L.HAVE_PIL, reason="Pillow nggak kepasang")
+def test_thumbnail_svg_dikirim_utuh(server, tree):
+    (tree / "Galeri" / "logo.svg").write_bytes(
+        b'<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40">'
+        b'<rect width="80" height="40" fill="#397"/></svg>'
+    )
+    server.login("4815")
+    status, headers, body = server.get("/thumb?p=Galeri/logo.svg")
+    assert status == 200
+    assert headers["Content-Type"] == "image/svg+xml"
+    assert body.startswith(b"<svg")
+    assert server.get("/thumb?p=Galeri/logo.svg")[2] == body  # kena cache
+
+
 def test_thumbnail_bukan_gambar_ngasih_404(server):
     server.login("4815")
     assert server.get("/thumb?p=klip.mp4")[0] == 404

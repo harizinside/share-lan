@@ -490,12 +490,11 @@ class Handler(BaseHTTPRequestHandler):
             if route == "/thumb":
                 if target is None:
                     return self.fail(404, "Bukan file.")
-                data = make_thumb(target)
-                if not data:
+                thumb = make_thumb(target)
+                if not thumb:
                     return self.fail(404, "Nggak ada thumbnail.")
-                return self.send(
-                    200, data, "image/jpeg", {"Cache-Control": "private, max-age=86400"}
-                )
+                data, ctype = thumb
+                return self.send(200, data, ctype, {"Cache-Control": "private, max-age=86400"})
         except (BrokenPipeError, ConnectionResetError):
             fmt.log(f"{C.dim('[' + self.ip + ']')} {C.warn('dibatalin klien')}")
             self.close_connection = True

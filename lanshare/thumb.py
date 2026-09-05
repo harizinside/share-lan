@@ -23,6 +23,8 @@ except ImportError:
 # PDFium tidak thread-safe, termasuk saat membuka/menutup dokumen.
 _pdf_lock = threading.Lock()
 
+SVG_THUMB_MAX = 256 * 1024  # SVG lebih besar dari ini nggak dikirim sebagai thumb
+
 
 def _pdf_thumb(path, box):
     with _pdf_lock, pdfium.PdfDocument(path) as doc:
@@ -86,11 +88,11 @@ def sha256_of(path):
 
 
 def make_thumb(path, box=360):
-    """JPEG kecil buat preview. None kalau nggak bisa - UI-nya mundur ke ikon."""
+    """(bytes, content_type) kecil buat preview. None kalau nggak bisa - UI mundur ke ikon."""
     if not HAVE_PIL:
         return None
     ext = os.path.splitext(path)[1].lower()
-    if ext not in IMAGE_EXT and not (ext == ".pdf" and HAVE_PDF):
+    if ext not in IMAGE_EXT and ext != ".pdf":
         return None
     try:
         key = file_key(path) + (box,)
@@ -102,17 +104,19 @@ def make_thumb(path, box=360):
         return hit
     try:
         if ext == ".pdf":
-            data = _pdf_thumb(path, box)
+            data, ctype = _pdf_thumb(path, box), "image/jpeg"
+        elif ext == ".svg":
+            data, ctype = _svg_thumb(path)
         else:
-            data = _image_thumb(path, box)
+            data, ctype = _image_thumb(path, box), "image/jpeg"
     except Exception:
         return None
     with ST.lock:
         if key not in ST.thumb_cache and len(ST.thumb_cache) >= THUMB_CACHE_MAX:
             oldest = next(iter(ST.thumb_cache))
             del ST.thumb_cache[oldest]
-        ST.thumb_cache[key] = data
-    return data
+        ST.thumb_cache[key] = (data, ctype)
+    return data, ctype
 
 
 def _image_thumb(path, box):
@@ -124,3 +128,14 @@ def _image_thumb(path, box):
         buf = io.BytesIO()
         im.save(buf, "JPEG", quality=82, optimize=True)
         return buf.getvalue()
+
+
+def _svg_thumb(path):
+    """SVG-nya sendiri jadi thumbnail - browser merendernya native di <img>."""
+    if os.path.getsize(path) > SVG_THUMB_MAX:
+        raise ValueError("SVG kegedean buat dijadiin thumb")
+    with open(path, "rb") as f:
+        data = f.read()
+    if b"<svg" not in data:
+        raise ValueError("bukan SVG")
+    return data, "image/svg+xml"
