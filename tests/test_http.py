@@ -139,6 +139,19 @@ def test_zip_semua_mount(server):
     assert "klip.mp4" in names
 
 
+def test_zip_pilihan_beberapa_item(server):
+    server.login("4815")
+    # pilihan: folder Dokumen + file klip.mp4 (dikirim sebagai p= berulang)
+    _, _, body = server.get("/zip?p=Dokumen&p=klip.mp4")
+    zf = zipfile.ZipFile(io.BytesIO(body))
+    names = zf.namelist()
+    assert zf.testzip() is None
+    assert any(n.startswith("Dokumen/") for n in names)
+    assert "klip.mp4" in names
+    # tiap item tahan di puncak arsip-nya sendiri (nggak npm di-dump bareng)
+    assert not any(n.startswith("catatan.txt") for n in names)
+
+
 def test_zip_gede_pindah_ke_streaming(tree):
     httpd, client = start([tree / "Dokumen"], ["--zip-resume-limit", "1K"])
     try:

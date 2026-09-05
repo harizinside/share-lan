@@ -153,8 +153,24 @@ def kind_of(name, is_dir):
         return "video"
     if ext in AUDIO_EXT:
         return "audio"
-    if ext in {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".dmg", ".iso",
-               ".pkg", ".deb", ".rpm", ".exe", ".msi", ".apk", ".appimage"}:
+    if ext in {
+        ".zip",
+        ".rar",
+        ".7z",
+        ".tar",
+        ".gz",
+        ".bz2",
+        ".xz",
+        ".dmg",
+        ".iso",
+        ".pkg",
+        ".deb",
+        ".rpm",
+        ".exe",
+        ".msi",
+        ".apk",
+        ".appimage",
+    }:
         return "archive"
     if ext in {".xls", ".xlsx", ".xlsm", ".csv", ".ods"}:
         return "xls"

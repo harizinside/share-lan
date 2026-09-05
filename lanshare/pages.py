@@ -125,10 +125,18 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 .row .name{flex:1;min-width:0;font-weight:550;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
 .row .meta{color:var(--muted);font-size:12.5px;flex:none}
+.row .kind{color:var(--accent);font-size:11.5px;font-weight:600;
+  background:color-mix(in srgb,var(--accent) 12%,transparent);
+  padding:2px 8px;border-radius:999px}
 .row .act{display:flex;gap:4px;opacity:0;transition:opacity .15s}
 .row:hover .act,.row:focus-within .act{opacity:1}
 @media (hover:none){.row .act{opacity:1}}
 .ic{width:22px;height:22px;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* checklist */
+.ck{flex:none;width:20px;height:20px;margin:0;accent-color:var(--accent);cursor:pointer}
+.row.checked,.card.checked{border-color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 9%,transparent)}
 
 /* grid */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px}
@@ -141,11 +149,21 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 .card .cap{padding:8px 10px;display:flex;align-items:center;gap:6px}
 .card .cap span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;font-size:12.5px;font-weight:550}
+.card .cap .kind{font-size:10px;color:var(--accent)}
 .card .qr{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:8px;
   background:rgba(0,0,0,.45);color:#fff;display:grid;place-items:center;opacity:0;
   transition:opacity .15s;backdrop-filter:blur(4px)}
 .card:hover .qr{opacity:1}
 @media (hover:none){.card .qr{opacity:1}}
+
+/* bilah pilihan */
+.selbar{position:sticky;top:66px;z-index:20;display:flex;align-items:center;gap:10px;
+  flex-wrap:wrap;margin-bottom:14px;padding:9px 12px;border-radius:var(--r);
+  border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--card));
+  box-shadow:var(--shadow)}
+.selbar .cnt{font-weight:650;flex:1;min-width:120px}
+.selbar .cnt small{color:var(--muted);font-weight:500;display:block}
+.selbar .btn{padding:0 12px;height:34px;font-size:13px}
 
 /* kosong & skeleton */
 .empty{text-align:center;padding:64px 20px;color:var(--muted)}
@@ -228,7 +246,7 @@ const $ = s => document.querySelector(s);
 const enc = encodeURIComponent;
 const deep = new URLSearchParams(location.search).get("p");
 let S = {path: deep !== null ? deep : CFG.initial, entries: [], total: 0,
-         filter: "", view: "auto", loading: false};
+         filter: "", view: "auto", loading: false, sel: new Set()};
 
 /* ---------- ikon ---------- */
 const P = {
@@ -248,6 +266,10 @@ const TINT = {dir:"var(--accent)", image:"#e8735a", video:"#c07bff", audio:"#3aa
               archive:"#d99a2b", doc:"#4a8ef0", xls:"#27a844", ppt:"#f47a3c", sql:"#3aa6d6",
               code:"#5bbf6a", file:"var(--muted)"};
 const ico = (k, cls) => `<svg class="${cls||'ic'}" viewBox="0 0 24 24" stroke="${TINT[k]||TINT.file}">${P[k]||P.file}</svg>`;
+const KIND = {dir:"Folder", image:"Gambar", video:"Video", audio:"Audio",
+              archive:"Arsip", doc:"Dokumen", xls:"Spreadsheet", ppt:"Slide",
+              sql:"Database", code:"Kode", file:"File"};
+const kindTag = e => `<span class="kind">${e.dir?"Folder":KIND[e.kind]||"File"}</span>`;
 const UI = {
   qr:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2M14 21h1"/></svg>',
   dl:'<svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/></svg>',
@@ -296,7 +318,7 @@ function viewMode(){ const v=localStorage.getItem("ls-view");
 
 /* ---------- data ---------- */
 async function load(path){
-  S.path=path; S.loading=true; render();
+  S.path=path; S.loading=true; S.sel.clear(); render();
   const r=await fetch(`/api/list?p=${enc(path)}`, {headers:{"Accept":"application/json"}});
   if(!r.ok){ S.loading=false;
     if(path){ toast("Folder itu udah nggak dibagikan", true); return load(""); }
@@ -355,6 +377,17 @@ function render(){
   }
   $("#folderActions").innerHTML = acts.join("") + `<span id="zipnote"></span>`;
 
+  const selEl=$("#selbar");
+  if(S.sel.size){
+    const selNames = S.entries.filter(e=>S.sel.has(e.path)).map(e=>e.name);
+    selEl.innerHTML = `<div class="selbar">
+      <span class="cnt">${S.sel.size} dipilih
+        <small>${selNames.slice(0,3).join(", ")}${selNames.length>3?"…":""}</small></span>
+      <button class="btn primary" data-selzip="1">${UI.zip}Download pilihan</button>
+      <button class="btn" data-selclear="1">Batal</button>
+    </div>`;
+  } else selEl.innerHTML="";
+
   const box=$("#content");
   if(S.loading){ box.innerHTML=`<div class="sk"></div><div class="sk"></div><div class="sk"></div>`; return; }
   const list=filtered();
@@ -375,15 +408,21 @@ function render(){
     const d=Math.min(i,22)*18, tb = thumbTag(e);
     if(mode==="grid") return `<div class="card" style="animation-delay:${d}ms">
         <div class="ph" data-open="${escA(e.path)}" data-dir="${e.dir?1:0}">${ico(e.kind,"ic")}${tb}
+          <input type="checkbox" class="ck" style="position:absolute;top:8px;left:8px;z-index:2"
+                 data-check="${escA(e.path)}" ${S.sel.has(e.path)?"checked":""}>
           <button class="qr" data-qr="${escA(e.path)}" data-isdir="${e.dir?1:0}" title="QR">${UI.qr}</button>
         </div>
-        <div class="cap">${ico(e.kind,"ic")}<span title="${escA(e.name)}">${esc(e.name)}</span></div>
+        <div class="cap">${ico(e.kind,"ic")}<span title="${escA(e.name)}">${esc(e.name)}</span>${kindTag(e)}</div>
       </div>`;
+    const chk = `<input type="checkbox" class="ck" data-check="${escA(e.path)}"
+        ${S.sel.has(e.path)?"checked":""} aria-label="Pilih ${escA(e.name)}">`;
     return `<div class="row" style="animation-delay:${d}ms">
+        ${chk}
         <div class="thumb">${ico(e.kind,"ic")}${tb}</div>
         <div class="name" data-open="${escA(e.path)}" data-dir="${e.dir?1:0}"
              title="${escA(e.name)}">${esc(e.name)}</div>
-        <div class="meta mono">${e.dir?"folder":human(e.size)}</div>
+        <div class="meta">${kindTag(e)}</div>
+        <div class="meta mono">${e.dir?"—":human(e.size)}</div>
         <div class="meta mono">${when(e.mtime)}</div>
         <div class="act">
           <button class="iconbtn" data-qr="${escA(e.path)}" data-isdir="${e.dir?1:0}" title="QR">${UI.qr}</button>
@@ -501,7 +540,7 @@ function upload(files){
 
 /* ---------- event ---------- */
 document.addEventListener("click", ev=>{
-  const t=ev.target.closest("[data-go],[data-open],[data-qr],[data-hash],[data-zip],[data-urls],[data-qrfolder]");
+  const t=ev.target.closest("[data-go],[data-open],[data-qr],[data-hash],[data-zip],[data-urls],[data-qrfolder],[data-selzip],[data-selclear]");
   if(!t) return;
   if(t.dataset.go!==undefined){ load(t.dataset.go); return; }
   if(t.dataset.open!==undefined){
@@ -524,6 +563,17 @@ document.addEventListener("click", ev=>{
   if(t.dataset.hash!==undefined){ ev.preventDefault(); toast("Ngitung SHA-256...");
     fetch(`/api/hash?p=${enc(t.dataset.hash)}`).then(r=>r.json())
       .then(d=>d.sha256?copy(d.sha256,"SHA-256 disalin"):toast("Gagal",true)); return; }
+  if(t.dataset.selzip!==undefined){
+    if(!S.sel.size) return;
+    const q=[...S.sel].map(x=>"p="+enc(x)).join("&");
+    location.href="/zip?"+q; return; }
+  if(t.dataset.selclear!==undefined){ S.sel.clear(); render(); return; }
+});
+document.addEventListener("change", ev=>{
+  const cb=ev.target.closest("input.ck");
+  if(!cb) return;
+  if(cb.checked) S.sel.add(cb.dataset.check); else S.sel.delete(cb.dataset.check);
+  render();
 });
 $("#modal").onclick = e => { if(e.target.id==="modal") $("#modal").classList.remove("on"); };
 addEventListener("keydown", e=>{ if(e.key==="Escape") $("#modal").classList.remove("on");
@@ -587,6 +637,7 @@ SHELL = r"""<!doctype html>
     </div>
   </div>
   <div class="actions" id="folderActions"></div>
+  <div id="selbar"></div>
   <div id="content" class="list"></div>
 </main>
 __UPLOAD__

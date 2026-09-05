@@ -19,6 +19,7 @@ from .mounts import (
     resolve,
     safe_upload_name,
     total_stats,
+    walk_files,
 )
 from .pages import ERROR_PAGE, login_page, page_html
 from .qr import qr_svg
@@ -206,22 +207,53 @@ class Handler(BaseHTTPRequestHandler):
                 )
 
     # -- ZIP --------------------------------------------------------------
-    def serve_zip(self, p, target):
-        files, total = [], 0
-        for path, arc in zip_entries(p, target):
+    def serve_zip(self, paths):
+        if len(paths) > 1:
+            # pilihan: beberapa item, tiap-tiap dibungkus nama foldernya sendiri
+            entries = []
+            for pp in paths:
+                if not pp:
+                    continue
+                try:
+                    t = resolve(pp)
+                except (Missing, Denied):
+                    continue
+                base = os.path.basename(t.rstrip(os.sep)) or pp.split("/")[-1] or "item"
+                entries.append((base, t))
+            files, total = [], 0
+            for base, t in entries:
+                for path, arc in walk_files(t, prefix=base):
+                    try:
+                        total += os.path.getsize(path)
+                    except OSError:
+                        continue
+                    files.append((path, arc))
+            if not files:
+                return self.fail(404, "Nggak ada yang bisa di-download.")
+            name = "pilihan.zip"
+            key = "\x00".join(sorted(x for x in paths if x))
+        else:
+            p = paths[0] if paths else ""
             try:
-                total += os.path.getsize(path)
-            except OSError:
-                continue
-            files.append((path, arc))
-        if not files:
-            return self.fail(404, "Folder ini kosong.")
-        name = zip_name(p, target)
+                target = resolve(p)
+            except (Missing, Denied):
+                return self.fail(404, "Nggak ketemu.")
+            files, total = [], 0
+            for path, arc in zip_entries(p, target):
+                try:
+                    total += os.path.getsize(path)
+                except OSError:
+                    continue
+                files.append((path, arc))
+            if not files:
+                return self.fail(404, "Folder ini kosong.")
+            name = zip_name(p, target)
+            key = p
         quoted = urllib.parse.quote(name)
         disp = f"attachment; filename*=UTF-8''{quoted}"
 
         if total <= ST.cfg.zip_resume_limit:
-            segments, zsize = self.zip_plan(p, files, total)
+            segments, zsize = self.zip_plan(key, files, total)
             rng = parse_range(self.headers.get("Range"), zsize)
             if rng == "unsat":
                 return self.send(416, b"", "text/plain", {"Content-Range": f"bytes */{zsize}"})
@@ -450,7 +482,7 @@ class Handler(BaseHTTPRequestHandler):
                     target, os.path.basename(target), force_dl=self.qget(qs, "dl") == "1"
                 )
             if route == "/zip":
-                return self.serve_zip(p, target)
+                return self.serve_zip(qs.get("p") or [""])
             if route == "/urls":
                 return self.serve_urls(p, target)
             if route == "/sums":
