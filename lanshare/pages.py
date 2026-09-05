@@ -104,10 +104,24 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 
 /* daftar */
 .list{display:flex;flex-direction:column;gap:6px}
+.lhead{display:grid;grid-template-columns:28px 42px minmax(0,1fr) 110px 90px 96px auto;
+  align-items:center;gap:12px;padding:0 12px;height:30px;color:var(--muted);
+  font-size:11.5px;font-weight:600;letter-spacing:.02em;user-select:none}
+.lhead .col{display:flex;align-items:center;gap:4px;min-width:0;cursor:pointer;
+  padding:0;border:0;background:none;color:inherit;font:inherit;letter-spacing:inherit}
+.lhead .col:hover{color:var(--ink)}
+.lhead .col.m{justify-content:flex-end;text-align:right}
+.lhead .col.m .arrow{order:-1}
+.lhead .col .arrow{font-size:9px;line-height:1;opacity:0}
+.lhead .col[data-active="1"]{color:var(--accent)}
+.lhead .col[data-active="1"] .arrow{opacity:1}
+.lhead .ah{justify-self:end}
 .row{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:var(--r);
   border:1px solid transparent;transition:background .15s,border-color .15s,transform .15s;
   animation:pop .32s backwards}
 .row:hover{background:var(--card);border-color:var(--line2)}
+.row{display:grid;grid-template-columns:28px 42px minmax(0,1fr) 110px 90px 96px auto;
+  align-items:center;gap:12px}
 .row .thumb{width:42px;height:42px;border-radius:10px;flex:none;overflow:hidden;
   display:grid;place-items:center;background:var(--card2);border:1px solid var(--line2);
   position:relative}
@@ -122,15 +136,13 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
 .ph:hover .tb,.thumb:hover .tb{opacity:0}
 .vp.on{opacity:1}
 @media (hover:none){.vp{display:none}}
-.row .name{flex:1;min-width:0;font-weight:550;overflow:hidden;text-overflow:ellipsis;
+.row .name{min-width:0;font-weight:550;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
 .row .meta{color:var(--muted);font-size:12.5px;flex:none}
 .row .kind{color:var(--accent);font-size:11.5px;font-weight:600;
   background:color-mix(in srgb,var(--accent) 12%,transparent);
   padding:2px 8px;border-radius:999px}
-.row .act{display:flex;gap:4px;opacity:0;transition:opacity .15s}
-.row:hover .act,.row:focus-within .act{opacity:1}
-@media (hover:none){.row .act{opacity:1}}
+.row .act{display:flex;gap:4px;justify-content:flex-end}
 .ic{width:22px;height:22px;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
 
 /* checklist */
@@ -234,7 +246,10 @@ main{max-width:1080px;margin:0 auto;padding:20px 18px 0}
   .crumbs{width:100%}
   .tools{width:100%}
   .search{flex:1}
+  .lhead{display:none}
+  .row{grid-template-columns:28px 42px minmax(0,1fr) auto;gap:10px}
   .row .meta{display:none}
+  .row .act{display:none}
   .chip{letter-spacing:.1em;padding:0 10px}
   .job .pb{width:74px}
 }
@@ -247,6 +262,8 @@ const enc = encodeURIComponent;
 const deep = new URLSearchParams(location.search).get("p");
 let S = {path: deep !== null ? deep : CFG.initial, entries: [], total: 0,
          filter: "", view: "auto", loading: false, sel: new Set()};
+let sortKey = localStorage.getItem("ls-sort") || "name";
+let sortDir = localStorage.getItem("ls-dir") || "asc";
 
 /* ---------- ikon ---------- */
 const P = {
@@ -352,6 +369,31 @@ async function loadMore(){
 const filtered = () => { const q=S.filter.trim().toLowerCase();
   return q ? S.entries.filter(e=>e.name.toLowerCase().includes(q)) : S.entries; };
 
+/* ---------- urutan (ala Finder) ---------- */
+const KEYS = ["name","mtime","size","kind"];
+function sorted(list){
+  const coll = new Intl.Collator("id", {numeric:true, sensitivity:"base"});
+  const dir = sortDir==="desc" ? -1 : 1;
+  return list.slice().sort((a,b)=>{
+    if(a.dir!==b.dir) return a.dir ? -1 : 1;      /* folder selalu di atas */
+    let va, vb;
+    if(sortKey==="size"){ va=a.size; vb=b.size;
+      if(va===null||va===undefined) va=-1;
+      if(vb===null||vb===undefined) vb=-1;
+      return (va-vb)*dir || coll.compare(a.name,b.name); }
+    if(sortKey==="kind"){ va=KIND[a.kind]||"File"; vb=KIND[b.kind]||"File";
+      return coll.compare(va,vb)*dir || coll.compare(a.name,b.name); }
+    if(sortKey==="mtime"){ return (a.mtime-b.mtime)*dir || coll.compare(a.name,b.name); }
+    return coll.compare(a.name,b.name)*dir;
+  });
+}
+function setSort(key){
+  if(sortKey===key){ sortDir = sortDir==="asc" ? "desc" : "asc"; }
+  else { sortKey=key; sortDir="asc"; }
+  localStorage.setItem("ls-sort",sortKey); localStorage.setItem("ls-dir",sortDir);
+  render();
+}
+
 /* ---------- render ---------- */
 function render(){
   const parts = S.path ? S.path.split("/") : [];
@@ -404,7 +446,8 @@ function render(){
   const mode=viewMode();
   $("#viewBtn").innerHTML = mode==="grid" ? UI.list : UI.grid;
   box.className = mode;
-  box.innerHTML = list.map((e,i)=>{
+  box.innerHTML = (mode==="list" ? listHead() : "") +
+    sorted(list).map((e,i)=>{
     const d=Math.min(i,22)*18, tb = thumbTag(e);
     if(mode==="grid") return `<div class="card" style="animation-delay:${d}ms">
         <div class="ph" data-open="${escA(e.path)}" data-dir="${e.dir?1:0}">${ico(e.kind,"ic")}${tb}
@@ -416,19 +459,19 @@ function render(){
       </div>`;
     const chk = `<input type="checkbox" class="ck" data-check="${escA(e.path)}"
         ${S.sel.has(e.path)?"checked":""} aria-label="Pilih ${escA(e.name)}">`;
+    const act = `<div class="act">
+          <a class="iconbtn" href="${e.dir?`/zip?p=${enc(e.path)}`:dlUrl(e.path)}" title="Download">${UI.dl}</a>
+          <button class="iconbtn" data-qr="${escA(e.path)}" data-isdir="${e.dir?1:0}" title="QR">${UI.qr}</button>
+        </div>`;
     return `<div class="row" style="animation-delay:${d}ms">
         ${chk}
         <div class="thumb">${ico(e.kind,"ic")}${tb}</div>
         <div class="name" data-open="${escA(e.path)}" data-dir="${e.dir?1:0}"
              title="${escA(e.name)}">${esc(e.name)}</div>
-        <div class="meta">${kindTag(e)}</div>
-        <div class="meta mono">${e.dir?"—":human(e.size)}</div>
         <div class="meta mono">${when(e.mtime)}</div>
-        <div class="act">
-          <button class="iconbtn" data-qr="${escA(e.path)}" data-isdir="${e.dir?1:0}" title="QR">${UI.qr}</button>
-          ${e.dir?"":`<button class="iconbtn" data-hash="${escA(e.path)}" title="Salin SHA-256">${UI.hash}</button>`}
-          <a class="iconbtn" href="${e.dir?`/zip?p=${enc(e.path)}`:dlUrl(e.path)}" title="Download">${UI.dl}</a>
-        </div>
+        <div class="meta mono">${e.dir?"—":human(e.size)}</div>
+        <div class="meta">${kindTag(e)}</div>
+        ${act}
       </div>`;
   }).join("");
   if(S.total>S.entries.length) box.insertAdjacentHTML("beforeend",
@@ -440,6 +483,17 @@ function render(){
 }
 const esc = s => String(s).replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const escA = s => esc(s).replace(/"/g,"&quot;");
+
+/* Header kolom ala Finder — klik buat ganti kolom, klik lagi asc/desc */
+function listHead(){
+  const lbl = {name:"Nama", mtime:"Date Modified", size:"Size", kind:"Kind"};
+  const arrow = sortDir==="desc" ? "▼" : "▲";
+  return `<div class="lhead" role="row"><span></span><span></span>` + KEYS.map(k=>{
+    const act = sortKey===k ? ` data-active="1"` : "";
+    return `<button class="col ${k==="name"?"n":"m"}" data-sort="${k}"${act}>
+      <span class="arrow">${arrow}</span><span>${lbl[k]}</span></button>`;
+  }).join("") + `<span class="ah">Aksi</span></div>`;
+}
 
 /* Lazy-load bawaan browser: kalau thumbnail gagal, <img> dibuang dan ikonnya
    yang keliatan lagi - jadi nggak ada state kosong. */
@@ -540,7 +594,7 @@ function upload(files){
 
 /* ---------- event ---------- */
 document.addEventListener("click", ev=>{
-  const t=ev.target.closest("[data-go],[data-open],[data-qr],[data-hash],[data-zip],[data-urls],[data-qrfolder],[data-selzip],[data-selclear]");
+  const t=ev.target.closest("[data-go],[data-open],[data-qr],[data-hash],[data-zip],[data-urls],[data-qrfolder],[data-selzip],[data-selclear],[data-sort]");
   if(!t) return;
   if(t.dataset.go!==undefined){ load(t.dataset.go); return; }
   if(t.dataset.open!==undefined){
@@ -568,6 +622,7 @@ document.addEventListener("click", ev=>{
     const q=[...S.sel].map(x=>"p="+enc(x)).join("&");
     location.href="/zip?"+q; return; }
   if(t.dataset.selclear!==undefined){ S.sel.clear(); render(); return; }
+  if(t.dataset.sort!==undefined){ setSort(t.dataset.sort); return; }
 });
 document.addEventListener("change", ev=>{
   const cb=ev.target.closest("input.ck");
