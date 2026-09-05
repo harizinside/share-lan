@@ -161,6 +161,26 @@ lanshare [PATH ...]
 
 Servernya paket Python biasa (folder `lanshare/`, satu modul kecil per tanggung jawab — mount, auth, HTTP, ZIP, halaman, dst), dua dependency (`qrcode`, `pillow`) dideklarasiin di `pyproject.toml` — uv yang ngurus instalasinya. Pillow opsional: kalau nggak ada, thumbnail mati dan UI mundur ke ikon, sisanya jalan normal. Sisanya stdlib.
 
+## Install lewat satu baris (tanpa clone)
+
+Belum punya repo ini di komputer? Satu baris ini install `lanshare` langsung, cuma butuh Python
+(nggak perlu `uv`, `git`, atau apa pun lain):
+
+macOS / Ubuntu / Fedora / Linux lain:
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/harizinside/share-lan/main/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/harizinside/share-lan/main/install.ps1 | iex"
+```
+
+Abis itu tinggal panggil `lanshare` dari terminal manapun. Jalanin lagi installer-nya kapan aja
+buat update ke versi terbaru di branch `main`.
+
 ## Jalan tanpa ngetik `uv run`
 
 `pyproject.toml` ndaftarin `lanshare` sebagai command global. Install sekali pakai `uv tool install`, terus bisa dipanggil langsung dari mana aja tanpa `uv run`:
