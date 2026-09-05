@@ -49,6 +49,7 @@ APP = "lanshare"
 CHUNK = 1 << 20
 ZIP64_LIMIT = 0xFFFFFFFF
 SESSION_TTL = 86400
+THUMB_CACHE_MAX = 500  # entri; ~30KB/thumb -> ~15MB batas atas
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff", ".avif"}
 VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".mpg", ".mpeg"}
 AUDIO_EXT = {".mp3", ".m4a", ".wav", ".flac", ".ogg", ".aac", ".opus"}
@@ -80,6 +81,7 @@ class State:
         self.lock = threading.Lock()
         self.crc_cache = {}  # (path, size, mtime) -> crc32
         self.hash_cache = {}  # (path, size, mtime) -> sha256
+        self.thumb_cache = {}  # (path, size, mtime, box) -> bytes JPEG
         self.zip_plans = {}  # path -> (tanda tangan isi, segmen, ukuran)
         self.single_root = False  # cuma 1 folder yang dishare -> folder itu jadi root
         self.addresses = []  # [(ip, iface, skor)]
@@ -605,13 +607,6 @@ def sha256_of(path):
     return digest
 
 
-def thumb_cache_dir():
-    base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    d = os.path.join(base, APP, "thumbs")
-    os.makedirs(d, exist_ok=True)
-    return d
-
-
 def make_thumb(path, box=360):
     """JPEG kecil buat preview. None kalau nggak bisa - UI-nya mundur ke ikon."""
     if not HAVE_PIL:
@@ -619,16 +614,13 @@ def make_thumb(path, box=360):
     if os.path.splitext(path)[1].lower() not in IMAGE_EXT:
         return None
     try:
-        st = os.stat(path)
+        key = file_key(path) + (box,)
     except OSError:
         return None
-    key = hashlib.sha1(f"{path}|{st.st_size}|{int(st.st_mtime)}|{box}".encode()).hexdigest()
-    cached = os.path.join(thumb_cache_dir(), key + ".jpg")
-    try:
-        with open(cached, "rb") as f:
-            return f.read()
-    except OSError:
-        pass
+    with ST.lock:
+        hit = ST.thumb_cache.get(key)
+    if hit is not None:
+        return hit
     try:
         with Image.open(path) as im:
             im = ImageOps.exif_transpose(im)
@@ -640,13 +632,11 @@ def make_thumb(path, box=360):
             data = buf.getvalue()
     except Exception:
         return None
-    try:
-        tmp = cached + ".tmp"
-        with open(tmp, "wb") as f:
-            f.write(data)
-        os.replace(tmp, cached)
-    except OSError:
-        pass
+    with ST.lock:
+        if key not in ST.thumb_cache and len(ST.thumb_cache) >= THUMB_CACHE_MAX:
+            oldest = next(iter(ST.thumb_cache))
+            del ST.thumb_cache[oldest]
+        ST.thumb_cache[key] = data
     return data
 
 
