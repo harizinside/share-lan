@@ -1,6 +1,6 @@
 [project]
 name = "share-lan"
-version = "0.0.3"
+version = "0.0.4"
 description = "Share files over a WiFi/LAN network — recipients just scan a QR or type the IP + a 4-digit code"
 requires-python = ">=3.9"
 dependencies = [

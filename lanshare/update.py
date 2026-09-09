@@ -17,7 +17,7 @@ def installed_version():
     try:
         return version("share-lan")
     except PackageNotFoundError:
-        return "0.0.3"
+        return "0.0.4"
 
 
 def latest_release_tag():
