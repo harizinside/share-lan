@@ -39,7 +39,7 @@ def console_available():
     if not sys.stdin or sys.stdin.closed:
         return False
     try:
-        if sys.stdin.isatty():
+        if sys.stdin.isatty() and hasattr(os, "getpgrp") and hasattr(os, "tcgetpgrp"):
             return os.getpgrp() == os.tcgetpgrp(sys.stdin.fileno())
     except OSError:
         return False
